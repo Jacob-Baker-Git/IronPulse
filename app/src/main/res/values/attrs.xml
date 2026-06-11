@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <attr name="colorScreenBg"    format="color"/>
+    <attr name="colorCardBg"      format="color"/>
+    <attr name="colorPanelBg"     format="color"/>
+    <attr name="colorTextPrimary" format="color"/>
+    <attr name="colorTextMuted"   format="color"/>
+    <!-- Calendar cell colours -->
+    <attr name="calToday"         format="color"/>
+    <attr name="calRest"          format="color"/>
+    <attr name="calWorkout"       format="color"/>
+    <attr name="calEmpty"         format="color"/>
+    <attr name="calSelected"      format="color"/>
+    <attr name="streakTrack"      format="color"/>
+    <attr name="colorFieldBg"     format="color"/>
+    <attr name="colorBorder"      format="color"/>
+</resources>

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Dumbbell bar -->
+    <path
+        android:fillColor="#22C882"
+        android:pathData="M35,49.5 h38 v7 h-38 z"/>
+    <!-- Inner plates -->
+    <path
+        android:fillColor="#22C882"
+        android:pathData="M29,38 h7 a2,2 0 0 1 2,2 v26 a2,2 0 0 1 -2,2 h-7 a2,2 0 0 1 -2,-2 v-26 a2,2 0 0 1 2,-2 z"/>
+    <path
+        android:fillColor="#22C882"
+        android:pathData="M72,38 h7 a2,2 0 0 1 2,2 v26 a2,2 0 0 1 -2,2 h-7 a2,2 0 0 1 -2,-2 v-26 a2,2 0 0 1 2,-2 z"/>
+    <!-- Outer plates -->
+    <path
+        android:fillColor="#22C882"
+        android:pathData="M20,44 h4 a2,2 0 0 1 2,2 v14 a2,2 0 0 1 -2,2 h-4 a2,2 0 0 1 -2,-2 v-14 a2,2 0 0 1 2,-2 z"/>
+    <path
+        android:fillColor="#22C882"
+        android:pathData="M84,44 h4 a2,2 0 0 1 2,2 v14 a2,2 0 0 1 -2,2 h-4 a2,2 0 0 1 -2,-2 v-14 a2,2 0 0 1 2,-2 z"/>
+    <!-- Pulse line -->
+    <path
+        android:strokeColor="#FFB937"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M26,78 h16 l5,-8 l6,14 l5,-10 l3,4 h21"/>
+</vector>

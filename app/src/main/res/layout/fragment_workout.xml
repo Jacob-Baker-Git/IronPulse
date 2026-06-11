@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?attr/colorScreenBg"
+    android:padding="16dp">
+
+    <TextView
+        android:text="Workout"
+        android:textColor="?attr/colorTextPrimary"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="10dp"/>
+
+    <!-- Date strip -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/date_strip_rv"
+        android:layout_width="match_parent"
+        android:layout_height="100dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:overScrollMode="never"
+        android:scrollbars="none"
+        android:layout_marginBottom="8dp"/>
+
+    <!-- Streak bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="?attr/colorCardBg"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:layout_marginBottom="8dp">
+        <TextView
+            android:id="@+id/streak_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="@color/accent"
+            android:textSize="13sp"
+            android:textStyle="bold"/>
+        <ProgressBar
+            android:id="@+id/streak_bar"
+            style="@style/Widget.AppCompat.ProgressBar.Horizontal"
+            android:layout_width="110dp"
+            android:layout_height="14dp"
+            android:max="30"
+            android:progressDrawable="@drawable/streak_progress"/>
+    </LinearLayout>
+
+    <!-- Edit / Template buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="end"
+        android:layout_marginBottom="6dp">
+        <Button
+            android:id="@+id/btn_template"
+            android:text="Template"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:textSize="12sp"
+            android:textColor="?attr/colorTextPrimary"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/btn_secondary"/>
+        <Button
+            android:id="@+id/btn_edit"
+            android:text="Edit"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:textSize="12sp"
+            android:textColor="@color/white"
+            android:background="@drawable/btn_primary"/>
+    </LinearLayout>
+
+    <!-- Empty state (shown when no exercises) -->
+    <LinearLayout
+        android:id="@+id/empty_state"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingTop="24dp"
+        android:paddingBottom="8dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/empty_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="No exercises yet — tap + to add or use a Template"
+            android:textColor="?attr/colorTextMuted"
+            android:textSize="13sp"
+            android:gravity="center"
+            android:layout_marginBottom="12dp"/>
+
+        <Button
+            android:id="@+id/btn_rest_day"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:textSize="12sp"
+            android:textColor="@color/white"
+            android:background="@drawable/btn_secondary"/>
+
+    </LinearLayout>
+
+    <!-- Exercise list — FrameLayout allows FAB to float over it properly -->
+    <androidx.coordinatorlayout.widget.CoordinatorLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/exercise_recycler"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingBottom="72dp"/>
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fab_add"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="16dp"
+            android:src="@android:drawable/ic_input_add"
+            android:contentDescription="Add exercise"
+            app:backgroundTint="@color/accent"
+            app:tint="@color/white"/>
+
+    </androidx.coordinatorlayout.widget.CoordinatorLayout>
+
+</LinearLayout>

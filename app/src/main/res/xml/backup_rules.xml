@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and lower: back up all app data (workout JSON files in filesDir). -->
+<full-backup-content/>

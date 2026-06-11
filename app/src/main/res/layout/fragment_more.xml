@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?attr/colorScreenBg">
+
+    <!-- Tab bar with indicator -->
+    <LinearLayout
+        android:id="@+id/tab_bar"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:orientation="horizontal"
+        android:background="?attr/colorPanelBg">
+
+        <TextView
+            android:id="@+id/tab_prs"
+            android:text="PRs"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:textSize="12sp"
+            android:textColor="@color/accent"
+            android:textStyle="bold"
+            android:background="@drawable/tab_selected_bg"
+            android:padding="4dp"/>
+
+        <TextView
+            android:id="@+id/tab_macros"
+            android:text="Macros"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:textSize="12sp"
+            android:textColor="?attr/colorTextMuted"
+            android:padding="4dp"/>
+
+        <TextView
+            android:id="@+id/tab_assessment"
+            android:text="Analysis"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:textSize="12sp"
+            android:textColor="?attr/colorTextMuted"
+            android:padding="4dp"/>
+
+        <TextView
+            android:id="@+id/tab_settings"
+            android:text="Settings"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:textSize="12sp"
+            android:textColor="?attr/colorTextMuted"
+            android:padding="4dp"/>
+
+    </LinearLayout>
+
+    <!-- Thin accent indicator line -->
+    <View
+        android:id="@+id/tab_indicator"
+        android:layout_width="match_parent"
+        android:layout_height="2dp"
+        android:background="@color/accent"/>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+            <LinearLayout
+                android:id="@+id/more_content"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp"/>
+        </ScrollView>
+
+        <!-- Floating green + for adding a PR (shown only on the PRs tab) -->
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fab_add_pr"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="16dp"
+            android:src="@android:drawable/ic_input_add"
+            android:contentDescription="Add PR"
+            android:visibility="gone"
+            app:backgroundTint="@color/accent"
+            app:tint="@color/white"/>
+
+    </FrameLayout>
+
+</LinearLayout>

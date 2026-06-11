@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Outer frame keeps a fixed layout slot; the inner box is what scales -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="56dp" android:layout_height="100dp"
+    android:layout_marginStart="3dp" android:layout_marginEnd="3dp"
+    android:clipChildren="false" android:clipToPadding="false">
+
+    <LinearLayout android:id="@+id/cell_box"
+        android:layout_width="56dp" android:layout_height="72dp"
+        android:layout_gravity="center"
+        android:orientation="vertical" android:gravity="center"
+        android:padding="4dp">
+        <TextView android:id="@+id/day_label"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="?attr/colorTextMuted" android:textSize="9sp"/>
+        <TextView android:id="@+id/num_label"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="?attr/colorTextPrimary" android:textSize="18sp" android:textStyle="bold"
+            android:layout_marginTop="2dp"/>
+        <View android:id="@+id/status_dot"
+            android:layout_width="7dp" android:layout_height="7dp"
+            android:layout_marginTop="4dp" android:background="@drawable/dot_shape"/>
+    </LinearLayout>
+</FrameLayout>

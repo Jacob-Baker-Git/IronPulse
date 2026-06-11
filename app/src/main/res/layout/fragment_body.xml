@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="?attr/colorScreenBg"
+    android:padding="16dp">
+
+    <TextView android:text="Body" android:textColor="?attr/colorTextPrimary"
+        android:textSize="22sp" android:textStyle="bold"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:layout_marginBottom="12dp"/>
+
+    <!-- Height + last weighed -->
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:background="?attr/colorCardBg"
+        android:padding="16dp" android:layout_marginBottom="10dp">
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:orientation="vertical">
+            <TextView android:text="Height" android:textColor="?attr/colorTextPrimary"
+                android:textSize="14sp" android:textStyle="bold"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+            <TextView android:id="@+id/last_weighed" android:textColor="?attr/colorTextMuted"
+                android:textSize="12sp"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+        </LinearLayout>
+        <TextView android:id="@+id/btn_set_height" android:text="Set Height"
+            android:textColor="@color/white" android:background="@color/accent"
+            android:padding="10dp"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+    </LinearLayout>
+
+    <!-- Weight trend chart -->
+    <com.ironpulse.ui.WeightChartView
+        android:id="@+id/weight_chart"
+        android:layout_width="match_parent"
+        android:layout_height="220dp"
+        android:layout_marginBottom="10dp"/>
+
+    <!-- Goal-weight progress bar (populated in code, hidden until a goal is set) -->
+    <LinearLayout
+        android:id="@+id/goal_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="?attr/colorCardBg"
+        android:padding="14dp"
+        android:layout_marginBottom="10dp"
+        android:visibility="gone"/>
+
+    <!-- Add + Clear All + Edit row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="10dp">
+        <Button android:id="@+id/btn_add_weight" android:text="+ Log Weight"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:layout_marginEnd="6dp"
+            android:minHeight="0dp" android:insetTop="0dp" android:insetBottom="0dp"
+            android:backgroundTint="@color/accent"/>
+        <Button android:id="@+id/btn_clear_weight" android:text="Clear All"
+            android:layout_width="wrap_content" android:layout_height="match_parent"
+            android:layout_marginEnd="6dp"
+            android:minHeight="0dp" android:insetTop="0dp" android:insetBottom="0dp"
+            android:textColor="@color/white"
+            android:background="@drawable/btn_danger"/>
+        <Button android:id="@+id/btn_body_edit" android:text="Edit"
+            android:layout_width="wrap_content" android:layout_height="match_parent"
+            android:minWidth="72dp" android:minHeight="0dp"
+            android:insetTop="0dp" android:insetBottom="0dp"
+            android:textColor="@color/white"
+            android:background="@drawable/btn_secondary"/>
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/body_recycler"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:overScrollMode="never"/>
+
+</LinearLayout>

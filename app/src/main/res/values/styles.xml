@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark theme (default) -->
+    <style name="Theme.IronPulse" parent="Theme.MaterialComponents.NoActionBar">
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="colorPrimary">@color/accent</item>
+        <item name="colorPrimaryDark">@color/accent_dark</item>
+        <item name="colorAccent">@color/accent</item>
+        <item name="android:windowBackground">@color/bg_dark</item>
+        <item name="android:textColor">@color/text_primary</item>
+        <item name="android:colorBackground">@color/bg_dark</item>
+        <item name="colorScreenBg">@color/bg_dark</item>
+        <item name="colorCardBg">@color/card_bg</item>
+        <item name="colorPanelBg">@color/panel_dark</item>
+        <item name="colorTextPrimary">@color/text_primary</item>
+        <item name="colorTextMuted">@color/text_muted</item>
+        <item name="calToday">@color/cal_today</item>
+        <item name="calRest">@color/cal_rest</item>
+        <item name="calWorkout">@color/cal_workout</item>
+        <item name="calEmpty">@color/cal_empty</item>
+        <item name="calSelected">@color/cal_selected</item>
+        <item name="streakTrack">@color/panel_mid</item>
+        <item name="colorFieldBg">@color/field_bg</item>
+        <item name="colorBorder">@color/border</item>
+    </style>
+
+    <!-- Light theme -->
+    <style name="Theme.IronPulse.Light" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="colorPrimary">@color/accent</item>
+        <item name="colorPrimaryDark">@color/accent_dark</item>
+        <item name="colorAccent">@color/accent</item>
+        <item name="android:windowBackground">@color/bg_light</item>
+        <item name="android:textColor">@color/text_primary_light</item>
+        <item name="android:colorBackground">@color/bg_light</item>
+        <item name="colorScreenBg">@color/bg_light</item>
+        <item name="colorCardBg">@color/card_bg_light</item>
+        <item name="colorPanelBg">@color/panel_light</item>
+        <item name="colorTextPrimary">@color/text_primary_light</item>
+        <item name="colorTextMuted">@color/text_muted_light</item>
+        <item name="calToday">@color/cal_today_light</item>
+        <item name="calRest">@color/cal_rest_light</item>
+        <item name="calWorkout">@color/cal_workout_light</item>
+        <item name="calEmpty">@color/cal_empty_light</item>
+        <item name="calSelected">@color/cal_selected_light</item>
+        <item name="streakTrack">@color/streak_track_light</item>
+        <item name="colorFieldBg">@color/field_bg_light</item>
+        <item name="colorBorder">@color/border_light</item>
+    </style>
+</resources>

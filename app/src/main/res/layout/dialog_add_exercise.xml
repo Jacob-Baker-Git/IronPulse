@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="vertical" android:padding="20dp">
+    <EditText android:id="@+id/field_name" android:hint="Exercise name"
+        android:layout_width="match_parent" android:layout_height="44dp" android:layout_marginBottom="8dp"/>
+    <EditText android:id="@+id/field_weight" android:hint="Weight (kg or BW)"
+        android:layout_width="match_parent" android:layout_height="44dp" android:layout_marginBottom="8dp"/>
+    <EditText android:id="@+id/field_sets" android:hint="Sets (default 3)" android:inputType="number"
+        android:layout_width="match_parent" android:layout_height="44dp" android:layout_marginBottom="8dp"/>
+    <EditText android:id="@+id/field_reps" android:hint="Reps (default 10)" android:inputType="number"
+        android:layout_width="match_parent" android:layout_height="44dp" android:layout_marginBottom="8dp"/>
+    <EditText android:id="@+id/field_rest" android:hint="Rest seconds (default 90)" android:inputType="number"
+        android:layout_width="match_parent" android:layout_height="44dp"/>
+</LinearLayout>

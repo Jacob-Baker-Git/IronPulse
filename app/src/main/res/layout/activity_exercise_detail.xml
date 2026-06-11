@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/detail_root"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:background="?attr/colorScreenBg" android:padding="16dp">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical">
+        <Button android:id="@+id/btn_back" android:text="← Back"
+            android:layout_width="wrap_content" android:layout_height="36dp"
+            android:backgroundTint="@color/panel_mid" android:layout_marginBottom="12dp"/>
+        <TextView android:id="@+id/exercise_title"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="?attr/colorTextPrimary" android:textSize="24sp" android:textStyle="bold"
+            android:layout_gravity="center_horizontal" android:layout_marginBottom="6dp"/>
+        <TextView android:id="@+id/exercise_stats"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="?attr/colorTextMuted" android:textSize="13sp"
+            android:layout_gravity="center_horizontal" android:layout_marginBottom="4dp"/>
+        <TextView android:id="@+id/prev_best"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="@color/accent" android:textSize="12sp" android:textStyle="bold"
+            android:layout_gravity="center_horizontal" android:layout_marginBottom="16dp"/>
+        <TextView android:id="@+id/timer_label"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="Rest timer ready" android:textColor="@color/accent_2"
+            android:textSize="32sp" android:textStyle="bold"
+            android:layout_gravity="center_horizontal" android:layout_marginBottom="20dp"/>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:layout_marginBottom="12dp">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:orientation="vertical" android:layout_marginEnd="8dp">
+                <TextView android:text="Weight (kg or BW)" android:textColor="?attr/colorTextMuted"
+                    android:textSize="11sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                <EditText android:id="@+id/field_weight" android:layout_width="match_parent"
+                    android:layout_height="44dp" android:background="@drawable/field_bg"
+                    android:textColor="?attr/colorTextPrimary" android:padding="8dp"/>
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                android:layout_weight="1" android:orientation="vertical">
+                <TextView android:text="Reps" android:textColor="?attr/colorTextMuted"
+                    android:textSize="11sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+                <EditText android:id="@+id/field_reps" android:layout_width="match_parent"
+                    android:layout_height="44dp" android:inputType="number"
+                    android:background="@drawable/field_bg" android:textColor="?attr/colorTextPrimary" android:padding="8dp"/>
+            </LinearLayout>
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:layout_marginBottom="8dp">
+            <Button android:id="@+id/btn_log_set" android:text="Log Set"
+                android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1"
+                android:layout_marginEnd="8dp" android:backgroundTint="@color/accent"/>
+            <Button android:id="@+id/btn_pause" android:text="Pause"
+                android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1"
+                android:backgroundTint="@color/panel_mid"/>
+        </LinearLayout>
+        <TextView android:id="@+id/set_history"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:textColor="?attr/colorTextMuted" android:textSize="12sp" android:layout_marginBottom="16dp"/>
+    </LinearLayout>
+</ScrollView>

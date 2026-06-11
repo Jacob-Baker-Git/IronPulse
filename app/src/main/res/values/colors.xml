@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark palette -->
+    <color name="bg_dark">#0A0C12</color>
+    <color name="panel_dark">#14192A</color>
+    <color name="panel_mid">#202834</color>
+    <color name="card_bg">#181E2C</color>
+    <color name="field_bg">#10141E</color>
+    <color name="accent">#22C882</color>
+    <color name="accent_dark">#0E8E5A</color>
+    <color name="accent_2">#FFB937</color>
+    <color name="danger">#E64444</color>
+    <color name="text_primary">#F0F4F8</color>
+    <color name="text_muted">#72889E</color>
+    <color name="border">#30404E</color>
+    <color name="white">#FFFFFF</color>
+    <color name="ic_launcher_background">#0E1320</color>
+    <color name="nav_icon_color">#72889E</color>
+    <color name="ripple_color">#33FFFFFF</color>
+    <color name="pill_push">#D25A1E</color>
+    <color name="pill_pull">#1E64C8</color>
+    <color name="pill_legs">#1EA050</color>
+    <color name="pill_arms">#963CC0</color>
+    <color name="pill_core">#C8A014</color>
+    <color name="pill_other">#505A64</color>
+    <!-- Calendar: dark -->
+    <color name="cal_selected">#1E3A4C</color>
+    <color name="cal_today">#14508A</color>
+    <color name="cal_rest">#123230</color>
+    <color name="cal_workout">#5A2A10</color>
+    <color name="cal_empty">#141A24</color>
+    <!-- Calendar: light (bright, readable tints) -->
+    <color name="cal_today_light">#A8CCED</color>
+    <color name="cal_rest_light">#A8E6C8</color>
+    <color name="cal_workout_light">#FFD4A8</color>
+    <color name="cal_empty_light">#E8ECF2</color>
+    <color name="cal_selected_light">#B8D4E8</color>
+    <!-- Light palette -->
+    <color name="bg_light">#F0F2F5</color>
+    <color name="panel_light">#E0E4EA</color>
+    <color name="panel_mid_light">#D4D9E2</color>
+    <color name="card_bg_light">#FFFFFF</color>
+    <color name="field_bg_light">#E8EBF0</color>
+    <color name="text_primary_light">#1A1E2C</color>
+    <color name="text_muted_light">#5A6880</color>
+    <color name="border_light">#C0CAD6</color>
+    <color name="ripple_color_light">#33000000</color>
+    <color name="streak_track_light">#C8D0D8</color>
+</resources>
