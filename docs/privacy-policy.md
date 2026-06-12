@@ -9,8 +9,8 @@ stays on your device.**
 ## Data the app stores
 
 IronPulse stores the information you enter — workout plans, completed
-exercises, logged sets, personal records, cardio sessions, body weight and
-measurements, food log and macro targets, sex (male/female, used for macro and
+exercises, logged sets, personal records, cardio sessions, body weight,
+food log and macro targets, sex (male/female, used for macro and
 body calculations), and app preferences (theme, units, reminder time).
 
 All of this is saved **only in the app's private storage on your device**.
