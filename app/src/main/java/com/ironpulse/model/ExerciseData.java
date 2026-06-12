@@ -1,7 +1,8 @@
 package com.ironpulse.model;
 import java.time.LocalDate;
 import java.time.DayOfWeek;
-import java.util.UUID;
+import java.time.format.TextStyle;
+import java.util.*;
 
 public class ExerciseData {
     /** Stable identity — survives renames; assigned on creation or migrated on load. */
@@ -16,10 +17,13 @@ public class ExerciseData {
     /** Legacy "3x10" form — kept in sync so old backups stay importable. */
     private String reps;
     private int restSeconds;
+    /** Weekdays this exercise recurs on (DayOfWeek names). Defaults to addedDate's day. */
+    private List<String> days;
 
     public ExerciseData(String name, String weightStr, String reps, int restSeconds, LocalDate addedDate) {
         this.id=UUID.randomUUID().toString();
         this.name=name; this.restSeconds=restSeconds; this.addedDate=addedDate;
+        this.days=new ArrayList<>(Collections.singletonList(addedDate.getDayOfWeek().name()));
         setReps(reps);
         parseWeight(weightStr);
     }
@@ -33,6 +37,8 @@ public class ExerciseData {
         if (id == null || id.isEmpty()) id = UUID.randomUUID().toString();
         if (sets <= 0 || repsPerSet <= 0) parseRepsString(reps);
         reps = sets + "x" + repsPerSet;
+        if (days == null || days.isEmpty())
+            days = new ArrayList<>(Collections.singletonList(addedDate.getDayOfWeek().name()));
     }
 
     private void parseRepsString(String r) {
@@ -66,6 +72,32 @@ public class ExerciseData {
     public int getRestSeconds() { return restSeconds; }
     public LocalDate getAddedDate() { return addedDate; }
     public DayOfWeek getDayOfWeek() { return addedDate.getDayOfWeek(); }
+
+    /** All weekdays this exercise recurs on (always at least one). */
+    public Set<DayOfWeek> getDays() {
+        Set<DayOfWeek> out = EnumSet.noneOf(DayOfWeek.class);
+        if (days != null)
+            for (String d : days) { try { out.add(DayOfWeek.valueOf(d)); } catch (Exception ignored) {} }
+        if (out.isEmpty()) out.add(addedDate.getDayOfWeek());
+        return out;
+    }
+
+    public void setDays(Collection<DayOfWeek> newDays) {
+        if (newDays == null || newDays.isEmpty()) return;
+        Set<DayOfWeek> ordered = EnumSet.copyOf(newDays);
+        days = new ArrayList<>();
+        for (DayOfWeek d : ordered) days.add(d.name());
+    }
+
+    /** "Mon, Thu" — for delete prompts and card labels. */
+    public String daysLabel() {
+        StringBuilder sb = new StringBuilder();
+        for (DayOfWeek d : getDays()) {
+            if (sb.length() > 0) sb.append(", ");
+            sb.append(d.getDisplayName(TextStyle.SHORT, Locale.ENGLISH));
+        }
+        return sb.toString();
+    }
     public String getWeight() { return isBodyweight?"":weightKg==Math.floor(weightKg)?String.valueOf((int)weightKg):String.valueOf(weightKg); }
     public void setWeight(String w) { parseWeight(w); }
     public void setReps(String r) { parseRepsString(r); reps = sets + "x" + repsPerSet; }

@@ -13,6 +13,7 @@ import com.ironpulse.R;
 import com.ironpulse.data.AppRepository;
 import com.ironpulse.data.Units;
 import com.ironpulse.model.BodyWeightEntry;
+import com.ironpulse.model.MeasurementEntry;
 import java.time.LocalDate;
 import java.util.*;
 
@@ -21,6 +22,7 @@ public class BodyFragment extends Fragment {
     private TextView lastWeighedText, heightBtn;
     private WeightChartView chartView;
     private LinearLayout goalContainer;
+    private LinearLayout measureContainer;
     private RecyclerView recycler;
     private EntryAdapter adapter;
     private LinearLayoutManager layoutManager;
@@ -44,6 +46,7 @@ public class BodyFragment extends Fragment {
         heightBtn       = v.findViewById(R.id.btn_set_height);
         chartView       = v.findViewById(R.id.weight_chart);
         goalContainer   = v.findViewById(R.id.goal_container);
+        measureContainer = v.findViewById(R.id.measure_container);
         recycler        = v.findViewById(R.id.body_recycler);
         editBtn         = v.findViewById(R.id.btn_body_edit);
 
@@ -137,6 +140,7 @@ public class BodyFragment extends Fragment {
             if (chartView != null) chartView.setData(Collections.emptyList());
             if (adapter != null) adapter.notifyDataSetChanged();
             buildGoalBar();
+            buildMeasurements();
             return;
         }
 
@@ -150,6 +154,7 @@ public class BodyFragment extends Fragment {
         lastWeighedText.setText("Last: " + Units.fmt(latest.getWeightKg()) + " — " + when);
 
         buildGoalBar();
+        buildMeasurements();
         if (adapter != null) adapter.notifyDataSetChanged();
         // Align the log with the chart's default (most-recent) window.
         recycler.post(this::updateGraphFromLog);
@@ -277,6 +282,146 @@ public class BodyFragment extends Fragment {
         now.setTextColor(themeColor(R.attr.colorTextMuted)); now.setTextSize(11);
         now.setPadding(0, 6, 0, 0);
         goalContainer.addView(now);
+    }
+
+    // ── Body measurements ─────────────────────────────────────────────────────
+
+    /** cm is stored; inches shown when the lbs unit setting is on. */
+    private String lenUnit() { return Units.useLbs() ? "in" : "cm"; }
+    private double lenToCm(double v) { return Units.useLbs() ? v * 2.54 : v; }
+    private double lenFromCm(double cm) { return Units.useLbs() ? cm / 2.54 : cm; }
+    private String lenFmt(double cm) {
+        double v = Math.round(lenFromCm(cm) * 10) / 10.0;
+        return (v == Math.floor(v) ? String.valueOf((long) v)
+                : String.format(java.util.Locale.US, "%.1f", v)) + " " + lenUnit();
+    }
+
+    private void buildMeasurements() {
+        if (measureContainer == null) return;
+        measureContainer.removeAllViews();
+
+        LinearLayout titleRow = new LinearLayout(requireContext());
+        titleRow.setOrientation(LinearLayout.HORIZONTAL);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = new TextView(requireContext());
+        title.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        title.setText("MEASUREMENTS");
+        title.setTextColor(themeColor(R.attr.colorTextMuted)); title.setTextSize(11);
+        title.setLetterSpacing(0.08f);
+        titleRow.addView(title);
+        if (!repo.measurements.isEmpty()) {
+            Button histBtn = new Button(requireContext());
+            histBtn.setText("History"); ButtonStyles.edit(histBtn);
+            LinearLayout.LayoutParams hlp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            hlp.setMargins(0, 0, 6, 0); histBtn.setLayoutParams(hlp);
+            histBtn.setOnClickListener(x -> showMeasurementHistory());
+            titleRow.addView(histBtn);
+        }
+        Button addBtn = new Button(requireContext());
+        addBtn.setText("+ Add"); ButtonStyles.log(addBtn);
+        addBtn.setOnClickListener(x -> showAddMeasurement());
+        titleRow.addView(addBtn);
+        measureContainer.addView(titleRow);
+
+        TextView summary = new TextView(requireContext());
+        if (repo.measurements.isEmpty()) {
+            summary.setText("Track waist, chest, arms and more — tap + Add.");
+            summary.setTextColor(themeColor(R.attr.colorTextMuted)); summary.setTextSize(11);
+        } else {
+            // Latest value per type, in the canonical type order
+            StringBuilder sb = new StringBuilder();
+            for (String type : MeasurementEntry.TYPES) {
+                MeasurementEntry latest = null;
+                for (MeasurementEntry m : repo.measurements)
+                    if (m.getType().equals(type)
+                            && (latest == null || m.getDate().isAfter(latest.getDate())))
+                        latest = m;
+                if (latest == null) continue;
+                if (sb.length() > 0) sb.append("   ·   ");
+                sb.append(type).append(" ").append(lenFmt(latest.getValueCm()));
+            }
+            summary.setText(sb.toString());
+            summary.setTextColor(themeColor(R.attr.colorTextPrimary)); summary.setTextSize(13);
+        }
+        summary.setPadding(0, 10, 0, 0);
+        measureContainer.addView(summary);
+    }
+
+    private void showAddMeasurement() {
+        Spinner typeSpin = new Spinner(requireContext());
+        ArrayAdapter<String> ta = new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_spinner_item, MeasurementEntry.TYPES);
+        ta.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        typeSpin.setAdapter(ta);
+
+        EditText valF = new EditText(requireContext());
+        valF.setHint("Value (" + lenUnit() + ")");
+        valF.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+
+        EditText dateF = new EditText(requireContext());
+        dateF.setText(LocalDate.now().toString());
+        Dialogs.attachDatePicker(dateF);
+
+        LinearLayout l = new LinearLayout(requireContext());
+        l.setOrientation(LinearLayout.VERTICAL); l.setPadding(48, 24, 48, 8);
+        l.addView(typeSpin); l.addView(valF); l.addView(dateF);
+
+        new AlertDialog.Builder(requireContext()).setTitle("Add Measurement").setView(l)
+            .setPositiveButton("Save", (d, w) -> {
+                try {
+                    double val = Double.parseDouble(valF.getText().toString().trim().replace(',', '.'));
+                    double cm = lenToCm(val);
+                    if (cm <= 0 || cm > 400) throw new NumberFormatException();
+                    LocalDate date = LocalDate.parse(dateF.getText().toString().trim());
+                    String type = typeSpin.getSelectedItem().toString();
+                    // One entry per type per day
+                    repo.measurements.removeIf(m -> m.getType().equals(type) && m.getDate().equals(date));
+                    repo.measurements.add(new MeasurementEntry(date, type, cm));
+                    repo.saveAsync();
+                    buildMeasurements();
+                } catch (Exception e) {
+                    Toast.makeText(requireContext(), "Invalid input", Toast.LENGTH_SHORT).show();
+                }
+            }).setNegativeButton("Cancel", null).show();
+    }
+
+    private void showMeasurementHistory() {
+        List<MeasurementEntry> sorted = new ArrayList<>(repo.measurements);
+        sorted.sort(Comparator.comparing(MeasurementEntry::getDate).reversed());
+
+        LinearLayout list = new LinearLayout(requireContext());
+        list.setOrientation(LinearLayout.VERTICAL);
+        list.setPadding(48, 16, 48, 8);
+        ScrollView scroll = new ScrollView(requireContext());
+        scroll.addView(list);
+
+        AlertDialog dlg = new AlertDialog.Builder(requireContext())
+                .setTitle("Measurement History").setView(scroll)
+                .setPositiveButton("Close", null).create();
+
+        for (MeasurementEntry m : sorted) {
+            LinearLayout row = new LinearLayout(requireContext());
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(0, 8, 0, 8);
+            TextView txt = new TextView(requireContext());
+            txt.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            txt.setText(formatDate(m.getDate()) + "  —  " + m.getType() + " " + lenFmt(m.getValueCm()));
+            txt.setTextColor(themeColor(R.attr.colorTextPrimary)); txt.setTextSize(13);
+            Button del = new Button(requireContext());
+            del.setText("Delete"); ButtonStyles.delete(del);
+            del.setOnClickListener(x -> Dialogs.confirmDelete(requireContext(),
+                    m.getType() + " on " + formatDate(m.getDate()), () -> {
+                repo.measurements.remove(m);
+                repo.saveAsync();
+                dlg.dismiss();
+                buildMeasurements();
+            }));
+            row.addView(txt); row.addView(del);
+            list.addView(row);
+        }
+        dlg.show();
     }
 
     /** Shown until a goal exists: empty track + how to set one up. */

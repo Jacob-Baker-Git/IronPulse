@@ -41,11 +41,41 @@
 
     </LinearLayout>
 
-    <!-- Chart fills all remaining space -->
+    <!-- Metric toggle: training volume vs estimated 1RM -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="36dp"
+        android:orientation="horizontal"
+        android:background="?attr/colorCardBg"
+        android:layout_marginBottom="12dp">
+
+        <TextView android:id="@+id/metric_volume"
+            android:text="Volume"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:gravity="center"
+            android:textSize="12sp" android:textStyle="bold"
+            android:textColor="@color/accent"/>
+
+        <TextView android:id="@+id/metric_e1rm"
+            android:text="Est. 1RM"
+            android:layout_width="0dp" android:layout_height="match_parent"
+            android:layout_weight="1" android:gravity="center"
+            android:textSize="12sp"
+            android:textColor="?attr/colorTextMuted"/>
+
+    </LinearLayout>
+
+    <!-- Chart fills remaining space, month heatmap below -->
     <com.ironpulse.ui.HistoryChartView
         android:id="@+id/history_chart"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"/>
+
+    <com.ironpulse.ui.MonthHeatmapView
+        android:id="@+id/month_heatmap"
+        android:layout_width="match_parent"
+        android:layout_height="210dp"
+        android:layout_marginTop="12dp"/>
 
 </LinearLayout>

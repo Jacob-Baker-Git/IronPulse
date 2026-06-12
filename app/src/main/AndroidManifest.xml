@@ -39,6 +39,16 @@
         <!-- Daily workout reminder + rest-over alert -->
         <receiver android:name=".notify.ReminderReceiver" android:exported="false"/>
         <receiver android:name=".notify.RestAlarmReceiver" android:exported="false"/>
+        <receiver android:name=".notify.QuickLogReceiver" android:exported="false"/>
+
+        <!-- Home screen widget: streak + today's plan -->
+        <receiver android:name=".widget.WorkoutWidgetProvider" android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/widget_workout_info"/>
+        </receiver>
         <receiver android:name=".notify.BootReceiver" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED"/>

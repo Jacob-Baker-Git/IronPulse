@@ -91,7 +91,7 @@ public class WorkoutFragment extends Fragment {
                 new AlertDialog.Builder(requireContext())
                     .setTitle("Delete Exercise")
                     .setMessage("Remove \"" + ex.getName() + "\" from every "
-                            + ex.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH) + "?")
+                            + ex.daysLabel() + "?")
                     .setPositiveButton("Delete", (d, w) -> {
                         repo.exercises.remove(ex);
                         if (repo.getExercisesForDate(selectedDate).isEmpty()) {
@@ -480,6 +480,7 @@ public class WorkoutFragment extends Fragment {
             h.check.setOnCheckedChangeListener((b, checked) -> {
                 if (!selectedDate.equals(LocalDate.now())) return; // double-guard
                 repo.markComplete(selectedDate, ex, checked); // saves internally
+                if (checked) toastNewAchievements();
                 refreshDateStrip();
                 updateStreak();
             });
@@ -503,7 +504,7 @@ public class WorkoutFragment extends Fragment {
                     new AlertDialog.Builder(requireContext())
                         .setTitle("Delete")
                         .setMessage("Remove \"" + ex.getName() + "\" from every "
-                                + ex.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH) + "?")
+                                + ex.daysLabel() + "?")
                         .setPositiveButton("Delete", (d, ww) -> {
                             repo.exercises.remove(ex);
                             repo.saveAsync();
@@ -552,6 +553,51 @@ public class WorkoutFragment extends Fragment {
 
     // ── Dialogs ───────────────────────────────────────────────────────────────
 
+    /** Common lifts offered alongside the user's own names in autocomplete. */
+    private static final String[] COMMON_EXERCISES = {
+        "Bench Press","Incline Bench Press","Incline DB Press","Overhead Press","Lateral Raise",
+        "Cable Fly","Dip","Push-Up","Tricep Pushdown","Overhead Tricep Extension","Skullcrusher",
+        "Deadlift","Romanian Deadlift","Pull-Up","Chin-Up","Lat Pulldown","Barbell Row","Cable Row",
+        "Dumbbell Row","Face Pull","Shrug","Bicep Curl","Hammer Curl","Preacher Curl",
+        "Squat","Front Squat","Leg Press","Bulgarian Split Squat","Lunge","Leg Extension",
+        "Leg Curl","Hip Thrust","Calf Raise","Plank","Crunch","Hanging Leg Raise","Russian Twist"
+    };
+
+    /**
+     * History, PRs and set logs all link by exercise NAME — autocomplete keeps
+     * "Bench press" from silently splitting off from "Bench Press".
+     */
+    private void attachNameSuggestions(EditText nameField) {
+        if (!(nameField instanceof AutoCompleteTextView)) return;
+        LinkedHashSet<String> names = new LinkedHashSet<>();
+        for (ExerciseData ex : repo.exercises) names.add(ex.getName());
+        for (List<ExerciseData> day : repo.completed.values())
+            for (ExerciseData ex : day) names.add(ex.getName());
+        for (com.ironpulse.model.RecordData r : repo.records) names.add(r.getName());
+        names.addAll(Arrays.asList(COMMON_EXERCISES));
+        AutoCompleteTextView actv = (AutoCompleteTextView) nameField;
+        actv.setAdapter(new ArrayAdapter<>(requireContext(),
+                android.R.layout.simple_dropdown_item_1line, new ArrayList<>(names)));
+        actv.setThreshold(1);
+    }
+
+    /** The 7 weekday checkboxes inside dialog_add_exercise, Monday-first. */
+    private CheckBox[] dayBoxes(View dlg) {
+        return new CheckBox[]{
+            dlg.findViewById(R.id.day_mon), dlg.findViewById(R.id.day_tue),
+            dlg.findViewById(R.id.day_wed), dlg.findViewById(R.id.day_thu),
+            dlg.findViewById(R.id.day_fri), dlg.findViewById(R.id.day_sat),
+            dlg.findViewById(R.id.day_sun)};
+    }
+
+    /** Selected days, falling back to {@code fallback} when none are ticked. */
+    private Set<DayOfWeek> selectedDays(CheckBox[] boxes, DayOfWeek fallback) {
+        Set<DayOfWeek> days = EnumSet.noneOf(DayOfWeek.class);
+        for (int i = 0; i < 7; i++) if (boxes[i].isChecked()) days.add(DayOfWeek.of(i + 1));
+        if (days.isEmpty()) days.add(fallback);
+        return days;
+    }
+
     private void showAddDialog() {
         View dlg = LayoutInflater.from(getContext())
                 .inflate(R.layout.dialog_add_exercise, null);
@@ -561,6 +607,9 @@ public class WorkoutFragment extends Fragment {
                  rF    = dlg.findViewById(R.id.field_reps),
                  restF = dlg.findViewById(R.id.field_rest);
         wF.setHint("Weight (" + Units.unit() + " or BW)");
+        attachNameSuggestions(nameF);
+        CheckBox[] boxes = dayBoxes(dlg);
+        boxes[selectedDate.getDayOfWeek().getValue() - 1].setChecked(true);
         // Fields start empty (hints show the defaults); pi() falls back to
         // 3 sets / 10 reps / 90s rest if the user leaves them blank.
 
@@ -569,10 +618,12 @@ public class WorkoutFragment extends Fragment {
                 String nm = nameF.getText().toString().trim();
                 if (nm.isEmpty()) return;
                 Runnable add = () -> {
-                    repo.exercises.add(new ExerciseData(nm,
+                    ExerciseData ex = new ExerciseData(nm,
                             Units.inputToKgString(wF.getText().toString()),
                             pi(sF.getText().toString(), 3) + "x" + pi(rF.getText().toString(), 10),
-                            pi(restF.getText().toString(), 90), selectedDate));
+                            pi(restF.getText().toString(), 90), selectedDate);
+                    ex.setDays(selectedDays(boxes, selectedDate.getDayOfWeek()));
+                    repo.exercises.add(ex);
                     repo.saveAsync();
                     refreshDateStrip();
                     refreshExercises();
@@ -596,19 +647,23 @@ public class WorkoutFragment extends Fragment {
                  rF    = dlg.findViewById(R.id.field_reps),
                  restF = dlg.findViewById(R.id.field_rest);
         wF.setHint("Weight (" + Units.unit() + " or BW)");
+        attachNameSuggestions(nameF);
         nameF.setText(ex.getName()); // renaming carries set-log history along
         wF.setText(ex.isBodyweight() ? "" : Units.num(ex.getWeightKg()));
         sF.setText(String.valueOf(ex.getSets()));
         rF.setText(String.valueOf(ex.getRepsPerSet()));
         restF.setText(String.valueOf(ex.getRestSeconds()));
+        CheckBox[] boxes = dayBoxes(dlg);
+        for (DayOfWeek dw : ex.getDays()) boxes[dw.getValue() - 1].setChecked(true);
 
         new AlertDialog.Builder(requireContext()).setTitle("Edit: " + ex.getName()).setView(dlg)
             .setPositiveButton("Save", (d, w) -> {
                 ex.setWeight(Units.inputToKgString(wF.getText().toString()));
                 ex.setReps(pi(sF.getText().toString(), 3) + "x" + pi(rF.getText().toString(), 10));
                 ex.setRestSeconds(pi(restF.getText().toString(), 90));
+                ex.setDays(selectedDays(boxes, ex.getDayOfWeek()));
                 repo.renameExercise(ex, nameF.getText().toString()); // saves internally
-                repo.saveAsync(); refreshExercises();
+                repo.saveAsync(); refreshDateStrip(); refreshExercises();
             }).setNegativeButton("Cancel", null).show();
     }
 
@@ -734,5 +789,12 @@ public class WorkoutFragment extends Fragment {
 
     private int pi(String s, int fb) {
         try { return Math.max(1, Integer.parseInt(s.trim())); } catch (Exception e) { return fb; }
+    }
+
+    private void toastNewAchievements() {
+        for (com.ironpulse.data.Achievements.Def d :
+                com.ironpulse.data.Achievements.checkAndUnlock(repo))
+            Toast.makeText(requireContext(),
+                    "🏆 Achievement unlocked: " + d.emoji + " " + d.title, Toast.LENGTH_LONG).show();
     }
 }

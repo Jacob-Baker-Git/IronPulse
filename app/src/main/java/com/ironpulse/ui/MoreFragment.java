@@ -26,6 +26,7 @@ public class MoreFragment extends Fragment {
     private PRsTab prsTab;
     private MacrosTab macrosTab;
     private AssessmentTab assessmentTab;
+    private AwardsTab awardsTab;
     private SettingsTab settingsTab;
 
     /** SAF picker for restoring a backup zip. */
@@ -44,6 +45,7 @@ public class MoreFragment extends Fragment {
         prsTab        = new PRsTab(this);
         macrosTab     = new MacrosTab(this);
         assessmentTab = new AssessmentTab(this);
+        awardsTab     = new AwardsTab(this);
         settingsTab   = new SettingsTab(this);
 
         View root = inf.inflate(R.layout.fragment_more, p, false);
@@ -55,6 +57,7 @@ public class MoreFragment extends Fragment {
             root.findViewById(R.id.tab_prs),
             root.findViewById(R.id.tab_macros),
             root.findViewById(R.id.tab_assessment),
+            root.findViewById(R.id.tab_awards),
             root.findViewById(R.id.tab_settings)
         };
         for (int i = 0; i < tabs.length; i++) {
@@ -101,7 +104,8 @@ public class MoreFragment extends Fragment {
             case 0: prsTab.build(c); break;
             case 1: macrosTab.build(c); break;
             case 2: assessmentTab.build(c); break;
-            case 3: settingsTab.build(c); break;
+            case 3: awardsTab.build(c); break;
+            case 4: settingsTab.build(c); break;
         }
         updateFab();
     }

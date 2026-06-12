@@ -14,7 +14,7 @@ public class AppRepository {
     public static final String[] DATA_FILES = {
             "exercises.json","body.json","records.json","cardio.json","setlogs.json",
             "rest_days.json","custom_splits.json","completed.json","foods.json",
-            "foodlog.json","prefs.json"};
+            "foodlog.json","prefs.json","measurements.json","achievements.json"};
 
     private static AppRepository instance;
     private final Context context;
@@ -24,6 +24,9 @@ public class AppRepository {
     public final List<ExerciseData> exercises = new ArrayList<>();
     public final Map<LocalDate, List<ExerciseData>> completed = new HashMap<>();
     public final List<BodyWeightEntry> bodyEntries = new ArrayList<>();
+    public final List<MeasurementEntry> measurements = new ArrayList<>();
+    /** Unlocked achievements: id → ISO date unlocked. */
+    public final Map<String,String> achievements = new HashMap<>();
     public final List<RecordData> records = new ArrayList<>();
     public final List<CardioEntry> cardio = new ArrayList<>();
     public final List<SetLog> setLogs = new ArrayList<>();
@@ -73,8 +76,8 @@ public class AppRepository {
             LocalDate added = ex.getAddedDate();
             // Only show from addedDate onwards (never before the exercise was created)
             if (added == null || added.isAfter(date)) continue;
-            long diff = java.time.temporal.ChronoUnit.DAYS.between(added, date);
-            if (diff % 7 == 0) result.add(ex);
+            // Recurs weekly on every selected weekday (default: the day it was added)
+            if (ex.getDays().contains(date.getDayOfWeek())) result.add(ex);
         }
         return result;
     }
@@ -126,6 +129,27 @@ public class AppRepository {
         return w>0?w*sets*reps:sets*reps;
     }
 
+    /**
+     * Auto-PR detection: if this weight beats the stored record for the same
+     * lift (matched by name, case-insensitive), update it and return the record.
+     */
+    public RecordData checkForNewPR(String exerciseName, double wKg) {
+        if (wKg <= 0) return null;
+        for (RecordData r : records) {
+            if (!r.getName().equalsIgnoreCase(exerciseName)) continue;
+            double prev = 0;
+            try { prev = Double.parseDouble(r.getWeight().replaceAll("[^0-9.]", "")); }
+            catch (Exception ignored) {}
+            if (wKg > prev) {
+                r.setWeight(wKg == Math.floor(wKg)
+                        ? String.valueOf((int) wKg) : String.valueOf(wKg));
+                return r;
+            }
+            return null; // one record per lift
+        }
+        return null;
+    }
+
     /** Renames an exercise and carries its logged-set history along with it. */
     public void renameExercise(ExerciseData ex, String newName) {
         String old = ex.getName();
@@ -163,6 +187,8 @@ public class AppRepository {
         // and corrupt JSON files).
         final List<ExerciseData> exSnap     = new ArrayList<>(exercises);
         final List<BodyWeightEntry> bwSnap  = new ArrayList<>(bodyEntries);
+        final List<MeasurementEntry> msSnap = new ArrayList<>(measurements);
+        final Map<String,String> achSnap    = new HashMap<>(achievements);
         final List<RecordData> recSnap      = new ArrayList<>(records);
         final List<CardioEntry> cardSnap    = new ArrayList<>(cardio);
         final List<SetLog> slSnap           = new ArrayList<>(setLogs);
@@ -201,6 +227,8 @@ public class AppRepository {
         ioExecutor.execute(() -> {
             saveJson("exercises.json", exSnap);
             saveJson("body.json", bwSnap);
+            saveJson("measurements.json", msSnap);
+            saveJson("achievements.json", achSnap);
             saveJson("records.json", recSnap);
             saveJson("cardio.json", cardSnap);
             saveJson("setlogs.json", slSnap);
@@ -210,6 +238,9 @@ public class AppRepository {
             saveJson("foods.json", foodsSnap);
             saveJson("foodlog.json", foodLogSnap);
             saveJson("prefs.json", prefsSnap);
+            // Data just changed — keep any launcher widgets in sync
+            try { com.ironpulse.widget.WorkoutWidgetProvider.updateAll(context); }
+            catch (Exception ignored) {}
         });
     }
 
@@ -220,6 +251,10 @@ public class AppRepository {
         for (ExerciseData e : exercises) e.normalize();
         List<BodyWeightEntry> bw=loadJson("body.json",new TypeToken<List<BodyWeightEntry>>(){}.getType());
         if (bw!=null) bodyEntries.addAll(bw);
+        List<MeasurementEntry> ms=loadJson("measurements.json",new TypeToken<List<MeasurementEntry>>(){}.getType());
+        if (ms!=null) measurements.addAll(ms);
+        Map<String,String> ach=loadJson("achievements.json",new TypeToken<Map<String,String>>(){}.getType());
+        if (ach!=null) achievements.putAll(ach);
         List<RecordData> rec=loadJson("records.json",new TypeToken<List<RecordData>>(){}.getType());
         if (rec!=null) records.addAll(rec);
         List<CardioEntry> card=loadJson("cardio.json",new TypeToken<List<CardioEntry>>(){}.getType());
@@ -297,7 +332,7 @@ public class AppRepository {
     public void clearAll() {
         exercises.clear(); completed.clear(); bodyEntries.clear();
         records.clear(); cardio.clear(); setLogs.clear(); restDays.clear(); customSplits.clear();
-        foodLog.clear(); savedFoods.clear();
+        foodLog.clear(); savedFoods.clear(); measurements.clear(); achievements.clear();
         Arrays.fill(macroGoals,""); Arrays.fill(macroActual,"");
         startWeightKg = 0; goalWeightKg = 0;
         gender = ""; // re-asked on next launch

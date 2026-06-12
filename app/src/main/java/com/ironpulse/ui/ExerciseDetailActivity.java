@@ -9,7 +9,7 @@ import com.ironpulse.data.AppRepository;
 import com.ironpulse.data.Units;
 import com.ironpulse.model.*;
 import com.ironpulse.notify.Notifications;
-import com.ironpulse.notify.RestAlarmReceiver;
+import com.ironpulse.notify.RestNotifier;
 import com.ironpulse.notify.RestTimerState;
 
 import java.time.LocalDate;
@@ -25,6 +25,9 @@ public class ExerciseDetailActivity extends AppCompatActivity {
     private int           targetSets = 0;
     private boolean       paused;
     private int           remainingSec;
+    /** Last weight/reps actually logged — what the notification quick-log repeats. */
+    private double        lastWKg;
+    private int           lastReps;
 
     private CountDownTimer restCountDown;
 
@@ -83,6 +86,12 @@ public class ExerciseDetailActivity extends AppCompatActivity {
         findViewById(R.id.btn_back).setOnClickListener(v -> finish());
         ((TextView) findViewById(R.id.weight_field_label))
                 .setText("Weight (" + Units.unit() + " or BW)");
+        findViewById(R.id.btn_plates).setOnClickListener(v -> {
+            // Prefer what's typed in the weight field, fall back to the plan weight
+            double kg = Units.parseToKg(weightField.getText().toString());
+            if (kg <= 0 && exercise != null) kg = exercise.getWeightKg();
+            PlateCalculator.show(this, kg);
+        });
 
         if (exercise == null) {
             titleView.setText("Exercise not found");
@@ -95,6 +104,9 @@ public class ExerciseDetailActivity extends AppCompatActivity {
         }
 
         targetSets = exercise.getSets();
+        // Sensible quick-log defaults until the first in-app set overrides them
+        lastWKg  = exercise.isBodyweight() ? 0 : exercise.getWeightKg();
+        lastReps = exercise.getRepsPerSet();
 
         // Count sets already logged for this exercise on this date
         loggedSets = (int) repo.setLogs.stream()
@@ -124,30 +136,47 @@ public class ExerciseDetailActivity extends AppCompatActivity {
                 restCountDown.cancel();
                 restCountDown = null;
                 RestTimerState.clear();
-                cancelRestAlarm();
-                cancelRestNotification();
+                RestNotifier.cancelAlarm(this);
+                RestNotifier.cancel(this);
                 setKeepScreenOn(false);
                 pauseBtn.setText("Resume");
             } else if (paused && remainingSec > 0) {
                 paused = false;
                 pauseBtn.setText("Pause");
                 RestTimerState.start(exercise.getName(), remainingSec);
-                postRestNotification();
-                scheduleRestAlarm();
+                RestNotifier.postCountdown(this, restBundle());
+                RestNotifier.scheduleAlarm(this, restBundle());
                 startCountdown();
             }
         });
+    }
 
-        // A rest started earlier is anchored to wall-clock time — returning to
-        // this screen (or reopening the app) picks it up where it really is.
-        if (isToday && RestTimerState.isActiveFor(exercise.getName())) {
+    @Override protected void onResume() {
+        super.onResume();
+        if (exercise == null) return;
+        // The notification quick-log may have advanced things while we were away
+        int count = (int) repo.setLogs.stream()
+                .filter(s -> s.getExerciseName().equals(exercise.getName())
+                          && s.getDate().equals(date))
+                .count();
+        if (count != loggedSets) { loggedSets = count; refresh(); }
+        // A rest is anchored to wall-clock time — pick it up where it really is.
+        if (date.equals(LocalDate.now()) && !paused
+                && RestTimerState.isActiveFor(exercise.getName())
+                && loggedSets < targetSets) {
+            cancelTimer();
             remainingSec = RestTimerState.remainingSeconds();
-            paused = false;
             pauseBtn.setText("Pause");
             pauseBtn.setVisibility(android.view.View.VISIBLE);
             timerView.setTextColor(getResources().getColor(R.color.accent_2, getTheme()));
             startCountdown();
         }
+    }
+
+    /** Everything the quick-log receiver needs to repeat the last set. */
+    private android.os.Bundle restBundle() {
+        return RestNotifier.extras(exercise.getId(), exercise.getName(), date.toString(),
+                lastWKg, lastReps, exercise.getRestSeconds(), targetSets, loggedSets);
     }
 
     private void refresh() {
@@ -218,18 +247,27 @@ public class ExerciseDetailActivity extends AppCompatActivity {
         int reps = pi(repsField.getText().toString(), 10);
 
         loggedSets++;
+        lastWKg = isBW || exercise.isBodyweight() ? 0 : wKg;
+        lastReps = reps;
         repo.setLogs.add(new SetLog(date, exercise.getName(), loggedSets,
                 wKg, reps, isBW || exercise.isBodyweight()));
-        checkForNewPR(wKg, isBW || exercise.isBodyweight());
+        RecordData pr = repo.checkForNewPR(exercise.getName(),
+                isBW || exercise.isBodyweight() ? 0 : wKg);
+        if (pr != null) Toast.makeText(this, "🎉 New PR: " + exercise.getName()
+                + " " + Units.fmt(wKg) + "!", Toast.LENGTH_LONG).show();
         repo.saveAsync();
+        for (com.ironpulse.data.Achievements.Def d :
+                com.ironpulse.data.Achievements.checkAndUnlock(repo))
+            Toast.makeText(this, "🏆 Achievement unlocked: " + d.emoji + " " + d.title,
+                    Toast.LENGTH_LONG).show();
 
         if (loggedSets >= targetSets) {
             // All sets done (markComplete saves internally)
             repo.markComplete(date, exercise, true);
             cancelTimer();
             RestTimerState.clear();
-            cancelRestAlarm();
-            cancelRestNotification();
+            RestNotifier.cancelAlarm(this);
+            RestNotifier.cancel(this);
             setKeepScreenOn(false);
             timerView.setText("✓ All sets done!");
             timerView.setTextColor(getResources().getColor(R.color.accent, getTheme()));
@@ -242,35 +280,14 @@ public class ExerciseDetailActivity extends AppCompatActivity {
         refresh();
     }
 
-    /**
-     * Auto-detects PRs: if this set's weight beats the stored record for the
-     * same lift (matched by name, case-insensitive), update it and celebrate.
-     */
-    private void checkForNewPR(double wKg, boolean isBW) {
-        if (isBW || wKg <= 0) return;
-        for (RecordData r : repo.records) {
-            if (!r.getName().equalsIgnoreCase(exercise.getName())) continue;
-            double prev = 0;
-            try { prev = Double.parseDouble(r.getWeight().replaceAll("[^0-9.]", "")); }
-            catch (Exception ignored) {}
-            if (wKg > prev) {
-                r.setWeight(wKg == Math.floor(wKg)
-                        ? String.valueOf((int) wKg) : String.valueOf(wKg));
-                Toast.makeText(this, "🎉 New PR: " + exercise.getName()
-                        + " " + Units.fmt(wKg) + "!", Toast.LENGTH_LONG).show();
-            }
-            return; // only one record per lift
-        }
-    }
-
     private void startRestTimer(int totalSec) {
         cancelTimer();
         paused = false;
         remainingSec = totalSec;
         RestTimerState.start(exercise.getName(), totalSec);
         maybeRequestNotifPermission();
-        postRestNotification();
-        scheduleRestAlarm();
+        RestNotifier.postCountdown(this, restBundle());
+        RestNotifier.scheduleAlarm(this, restBundle());
         pauseBtn.setText("Pause");
         pauseBtn.setVisibility(android.view.View.VISIBLE);
         timerView.setTextColor(getResources().getColor(R.color.accent_2, getTheme()));
@@ -290,8 +307,8 @@ public class ExerciseDetailActivity extends AppCompatActivity {
             @Override public void onFinish() {
                 remainingSec = 0;
                 RestTimerState.clear();
-                cancelRestAlarm();
-                cancelRestNotification();
+                RestNotifier.cancelAlarm(ExerciseDetailActivity.this);
+                RestNotifier.cancel(ExerciseDetailActivity.this);
                 setKeepScreenOn(false);
                 timerView.setText("Time's up — start your next set!");
                 timerView.setTextColor(getResources().getColor(R.color.danger, getTheme()));
@@ -302,61 +319,12 @@ public class ExerciseDetailActivity extends AppCompatActivity {
         }.start();
     }
 
-    // ── Rest notification + background alarm ────────────────────────────────
+    // ── Rest notification + background alarm (delegated to RestNotifier) ────
 
     private void maybeRequestNotifPermission() {
         if (Build.VERSION.SDK_INT >= 33 && !Notifications.canPost(this)) {
             requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 7);
         }
-    }
-
-    /** Live countdown in the shade — keeps ticking even if the app is left. */
-    private void postRestNotification() {
-        if (!Notifications.canPost(this)) return;
-        Notifications.ensureChannels(this);
-        android.app.PendingIntent open = android.app.PendingIntent.getActivity(this, 1,
-                new Intent(this, ExerciseDetailActivity.class)
-                        .putExtra("exercise_id", exercise.getId())
-                        .putExtra("exercise_name", exercise.getName())
-                        .putExtra("date", date.toString())
-                        .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
-                android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
-        androidx.core.app.NotificationCompat.Builder b =
-                new androidx.core.app.NotificationCompat.Builder(this, Notifications.CHANNEL_REST)
-                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-                .setContentTitle("Resting — " + exercise.getName())
-                .setContentText("Next set when the timer hits zero")
-                .setUsesChronometer(true)
-                .setChronometerCountDown(true)
-                .setWhen(RestTimerState.endsAt())
-                .setOnlyAlertOnce(true)
-                .setAutoCancel(true)
-                .setContentIntent(open);
-        android.app.NotificationManager nm = getSystemService(android.app.NotificationManager.class);
-        if (nm != null) nm.notify(Notifications.ID_REST, b.build());
-    }
-
-    private void cancelRestNotification() {
-        android.app.NotificationManager nm = getSystemService(android.app.NotificationManager.class);
-        if (nm != null) nm.cancel(Notifications.ID_REST);
-    }
-
-    private android.app.PendingIntent restAlarmIntent() {
-        return android.app.PendingIntent.getBroadcast(this, 101,
-                new Intent(this, RestAlarmReceiver.class).putExtra("exercise", exercise.getName()),
-                android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
-    }
-
-    /** Backgrounded "rest over" alert — inexact is fine for a gym timer. */
-    private void scheduleRestAlarm() {
-        android.app.AlarmManager am = getSystemService(android.app.AlarmManager.class);
-        if (am != null) am.setAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP,
-                RestTimerState.endsAt(), restAlarmIntent());
-    }
-
-    private void cancelRestAlarm() {
-        android.app.AlarmManager am = getSystemService(android.app.AlarmManager.class);
-        if (am != null) am.cancel(restAlarmIntent());
     }
 
     private void setKeepScreenOn(boolean on) {

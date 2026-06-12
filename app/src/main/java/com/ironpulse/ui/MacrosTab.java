@@ -57,6 +57,31 @@ class MacrosTab {
         rlp.setMargins(0, 0, 0, 8); rings.setLayoutParams(rlp);
         c.addView(rings);
 
+        // ── Calorie adherence history ──
+        if (!host.repo.foodLog.isEmpty()) {
+            double goalCals = host.parseD(host.repo.macroGoals[0]);
+            host.hdr(c, "Calories — last 30 days"
+                    + (goalCals > 0 ? "  ·  goal " + (int) goalCals + " kcal" : ""));
+            HistoryChartView chart = new HistoryChartView(host.requireContext());
+            chart.setBgColor(host.themeColor(R.attr.colorCardBg));
+            chart.setTextColor(host.themeColor(R.attr.colorTextMuted));
+            List<Double> vals = new ArrayList<>();
+            List<String> labels = new ArrayList<>();
+            java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("d/MM");
+            for (int i = 29; i >= 0; i--) {
+                LocalDate d = LocalDate.now().minusDays(i);
+                double sum = 0;
+                for (Food f : host.repo.foodLog.getOrDefault(d, Collections.emptyList())) sum += f.getCals();
+                vals.add(sum);
+                labels.add(d.format(fmt));
+            }
+            chart.setData(vals, labels);
+            LinearLayout.LayoutParams clp2 = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, host.dp(170));
+            clp2.setMargins(0, 0, 0, 12); chart.setLayoutParams(clp2);
+            c.addView(chart);
+        }
+
         // ── Quick-add chips (presets + saved foods) ──
         host.hdr(c, "Quick Add  ·  tap to log");
         HorizontalScrollView hsv = new HorizontalScrollView(host.requireContext());

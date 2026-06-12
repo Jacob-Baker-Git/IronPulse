@@ -31,12 +31,19 @@ class AssessmentTab {
         for (java.time.DayOfWeek d : java.time.DayOfWeek.values()) byDay.put(d, new ArrayList<>());
         int totalSets=0, shortRest=0, longRest=0, restCount=0; double avgRest=0;
         for (ExerciseData ex : host.repo.exercises) {
-            if (host.repo.restDays.contains(ex.getDayOfWeek())) continue;
-            byDay.get(ex.getDayOfWeek()).add(ex);
             String cat = host.repo.classifyExercise(ex.getName());
             int sets = ex.getSets();
-            setCounts.merge(cat,sets,Integer::sum);
-            totalSets+=sets; avgRest+=ex.getRestSeconds(); restCount++;
+            boolean countedAnyDay = false;
+            // An exercise contributes weekly volume once per scheduled (non-rest) day
+            for (java.time.DayOfWeek d : ex.getDays()) {
+                if (host.repo.restDays.contains(d)) continue;
+                byDay.get(d).add(ex);
+                setCounts.merge(cat,sets,Integer::sum);
+                totalSets+=sets;
+                countedAnyDay = true;
+            }
+            if (!countedAnyDay) continue;
+            avgRest+=ex.getRestSeconds(); restCount++;
             if (ex.getRestSeconds()<45) shortRest++; if (ex.getRestSeconds()>180) longRest++;
         }
         if (restCount>0) avgRest/=restCount;

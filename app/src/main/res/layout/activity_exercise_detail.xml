@@ -54,6 +54,11 @@
                 android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1"
                 android:backgroundTint="@color/panel_mid"/>
         </LinearLayout>
+        <Button android:id="@+id/btn_plates" android:text="⚖  Plate Calculator"
+            android:layout_width="match_parent" android:layout_height="40dp"
+            android:layout_marginBottom="8dp"
+            android:textSize="12sp"
+            android:backgroundTint="@color/panel_mid"/>
         <TextView android:id="@+id/set_history"
             android:layout_width="match_parent" android:layout_height="wrap_content"
             android:textColor="?attr/colorTextMuted" android:textSize="12sp" android:layout_marginBottom="16dp"/>
