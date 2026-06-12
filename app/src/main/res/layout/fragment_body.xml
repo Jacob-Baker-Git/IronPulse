@@ -48,16 +48,6 @@
         android:layout_marginBottom="10dp"
         android:visibility="gone"/>
 
-    <!-- Body measurements (waist/chest/arms/…) — populated in code -->
-    <LinearLayout
-        android:id="@+id/measure_container"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:background="?attr/colorCardBg"
-        android:padding="14dp"
-        android:layout_marginBottom="10dp"/>
-
     <!-- Add + Clear All + Edit row -->
     <LinearLayout
         android:layout_width="match_parent"

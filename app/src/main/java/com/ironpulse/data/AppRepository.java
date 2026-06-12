@@ -14,7 +14,7 @@ public class AppRepository {
     public static final String[] DATA_FILES = {
             "exercises.json","body.json","records.json","cardio.json","setlogs.json",
             "rest_days.json","custom_splits.json","completed.json","foods.json",
-            "foodlog.json","prefs.json","measurements.json","achievements.json"};
+            "foodlog.json","prefs.json","achievements.json"};
 
     private static AppRepository instance;
     private final Context context;
@@ -24,7 +24,6 @@ public class AppRepository {
     public final List<ExerciseData> exercises = new ArrayList<>();
     public final Map<LocalDate, List<ExerciseData>> completed = new HashMap<>();
     public final List<BodyWeightEntry> bodyEntries = new ArrayList<>();
-    public final List<MeasurementEntry> measurements = new ArrayList<>();
     /** Unlocked achievements: id → ISO date unlocked. */
     public final Map<String,String> achievements = new HashMap<>();
     public final List<RecordData> records = new ArrayList<>();
@@ -187,7 +186,6 @@ public class AppRepository {
         // and corrupt JSON files).
         final List<ExerciseData> exSnap     = new ArrayList<>(exercises);
         final List<BodyWeightEntry> bwSnap  = new ArrayList<>(bodyEntries);
-        final List<MeasurementEntry> msSnap = new ArrayList<>(measurements);
         final Map<String,String> achSnap    = new HashMap<>(achievements);
         final List<RecordData> recSnap      = new ArrayList<>(records);
         final List<CardioEntry> cardSnap    = new ArrayList<>(cardio);
@@ -227,7 +225,6 @@ public class AppRepository {
         ioExecutor.execute(() -> {
             saveJson("exercises.json", exSnap);
             saveJson("body.json", bwSnap);
-            saveJson("measurements.json", msSnap);
             saveJson("achievements.json", achSnap);
             saveJson("records.json", recSnap);
             saveJson("cardio.json", cardSnap);
@@ -251,8 +248,6 @@ public class AppRepository {
         for (ExerciseData e : exercises) e.normalize();
         List<BodyWeightEntry> bw=loadJson("body.json",new TypeToken<List<BodyWeightEntry>>(){}.getType());
         if (bw!=null) bodyEntries.addAll(bw);
-        List<MeasurementEntry> ms=loadJson("measurements.json",new TypeToken<List<MeasurementEntry>>(){}.getType());
-        if (ms!=null) measurements.addAll(ms);
         Map<String,String> ach=loadJson("achievements.json",new TypeToken<Map<String,String>>(){}.getType());
         if (ach!=null) achievements.putAll(ach);
         List<RecordData> rec=loadJson("records.json",new TypeToken<List<RecordData>>(){}.getType());
@@ -332,7 +327,7 @@ public class AppRepository {
     public void clearAll() {
         exercises.clear(); completed.clear(); bodyEntries.clear();
         records.clear(); cardio.clear(); setLogs.clear(); restDays.clear(); customSplits.clear();
-        foodLog.clear(); savedFoods.clear(); measurements.clear(); achievements.clear();
+        foodLog.clear(); savedFoods.clear(); achievements.clear();
         Arrays.fill(macroGoals,""); Arrays.fill(macroActual,"");
         startWeightKg = 0; goalWeightKg = 0;
         gender = ""; // re-asked on next launch
