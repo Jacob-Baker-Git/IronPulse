@@ -20,7 +20,6 @@ public class SetLog {
     public double volume() { return isBodyweight?reps:weightKg*reps; }
     public String formatDisplay() {
         if (isBodyweight) return "Set "+setNumber+": BW × "+reps+" reps";
-        String w=weightKg==Math.floor(weightKg)?String.valueOf((int)weightKg):String.valueOf(weightKg);
-        return "Set "+setNumber+": "+w+"kg × "+reps+" reps";
+        return "Set "+setNumber+": "+com.ironpulse.data.Units.fmt(weightKg)+" × "+reps+" reps";
     }
 }

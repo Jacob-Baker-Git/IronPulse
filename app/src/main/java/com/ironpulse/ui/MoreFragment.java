@@ -10,6 +10,7 @@ import androidx.recyclerview.widget.*;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.ironpulse.R;
 import com.ironpulse.data.AppRepository;
+import com.ironpulse.data.Units;
 import com.ironpulse.model.*;
 import java.time.LocalDate;
 import java.util.*;
@@ -30,6 +31,16 @@ public class MoreFragment extends Fragment {
     private ItemTouchHelper prTouchHelper;
     private LinearLayout contentRef;
     private FloatingActionButton prFab;
+
+    /** SAF picker for restoring a backup zip. */
+    private final androidx.activity.result.ActivityResultLauncher<String[]> importPicker =
+        registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+            uri -> { if (uri != null) confirmImport(uri); });
+
+    /** POST_NOTIFICATIONS prompt when enabling workout reminders (API 33+). */
+    private final androidx.activity.result.ActivityResultLauncher<String> notifPermission =
+        registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+            granted -> {});
 
     @Nullable @Override
     public View onCreateView(@NonNull LayoutInflater inf, @Nullable ViewGroup p, @Nullable Bundle s) {
@@ -255,8 +266,13 @@ public class MoreFragment extends Fragment {
         @Override public void onBindViewHolder(@NonNull VH h, int pos) {
             RecordData r = repo.records.get(pos);
             h.name.setText(r.getName());
-            String wd = r.getWeight() == null || r.getWeight().isEmpty() ? "— not set"
-                    : r.getWeight().matches(".*[a-zA-Z].*") ? r.getWeight() : r.getWeight() + " kg";
+            String wd;
+            if (r.getWeight() == null || r.getWeight().isEmpty()) wd = "— not set";
+            else if (r.getWeight().matches(".*[a-zA-Z].*")) wd = r.getWeight();
+            else {
+                try { wd = Units.fmt(Double.parseDouble(r.getWeight())); }
+                catch (Exception e) { wd = r.getWeight(); }
+            }
             h.weight.setText("Best: " + wd);
 
             // Muscle group pill
@@ -295,7 +311,7 @@ public class MoreFragment extends Fragment {
 
     private void showAddPR(LinearLayout c) {
         EditText nf = new EditText(requireContext()); nf.setHint("Lift name");
-        EditText wf = new EditText(requireContext()); wf.setHint("Best weight (kg)");
+        EditText wf = new EditText(requireContext()); wf.setHint("Best weight (" + Units.unit() + ")");
         LinearLayout l = new LinearLayout(requireContext());
         l.setOrientation(LinearLayout.VERTICAL); l.setPadding(48, 24, 48, 0);
         l.addView(nf); l.addView(wf);
@@ -309,7 +325,9 @@ public class MoreFragment extends Fragment {
 
     private void showEditPR(RecordData r) {
         EditText wf = new EditText(requireContext());
-        wf.setHint("Best weight (kg)"); wf.setText(r.getWeight());
+        wf.setHint("Best weight (" + Units.unit() + ")");
+        try { wf.setText(Units.num(Double.parseDouble(r.getWeight()))); }
+        catch (Exception e) { wf.setText(r.getWeight()); }
         LinearLayout l = new LinearLayout(requireContext());
         l.setOrientation(LinearLayout.VERTICAL); l.setPadding(48, 24, 48, 0); l.addView(wf);
         new AlertDialog.Builder(requireContext()).setTitle("Edit: " + r.getName()).setView(l)
@@ -370,7 +388,7 @@ public class MoreFragment extends Fragment {
         c.addView(hsv);
         sp(c, 6);
 
-        Button custom = btn(c, "+ Add Custom Food", color(R.color.accent_dark));
+        Button custom = btn(c, "+ Add Custom Food", color(R.color.accent));
         custom.setOnClickListener(x -> showAddFoodDialog(c));
 
         // ── Today's logged foods ──
@@ -384,23 +402,23 @@ public class MoreFragment extends Fragment {
         lh.setText("Logged Today (" + today.size() + ")");
         lh.setTextColor(themeColor(R.attr.colorTextMuted)); lh.setTextSize(11);
         logHdr.addView(lh);
-        // Edit toggle: unlocks saved-food chips and the Daily Targets fields below
-        Button fe = new Button(requireContext());
-        fe.setText(foodEditMode ? "Done" : "Edit"); ButtonStyles.toggle(fe, foodEditMode);
-        LinearLayout.LayoutParams felp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        felp.setMargins(0, 0, 6, 0); fe.setLayoutParams(felp);
-        fe.setOnClickListener(x -> { foodEditMode = !foodEditMode; buildContent(c); });
-        logHdr.addView(fe);
         if (!today.isEmpty()) {
             Button clr = new Button(requireContext());
             clr.setText("Clear All"); ButtonStyles.delete(clr);
+            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            clp.setMargins(0, 0, 6, 0); clr.setLayoutParams(clp);
             clr.setOnClickListener(x -> Dialogs.confirm(requireContext(), "Clear log",
                     "Are you sure you want to clear everything logged today?", "Clear All", () -> {
                 repo.foodLog.remove(LocalDate.now()); repo.saveAsync(); buildContent(c);
             }));
             logHdr.addView(clr);
         }
+        // Edit toggle: unlocks saved-food chips and the Daily Targets fields below
+        Button fe = new Button(requireContext());
+        fe.setText(foodEditMode ? "Done" : "Edit"); ButtonStyles.toggle(fe, foodEditMode);
+        fe.setOnClickListener(x -> { foodEditMode = !foodEditMode; buildContent(c); });
+        logHdr.addView(fe);
         c.addView(logHdr);
 
         if (today.isEmpty()) {
@@ -420,7 +438,7 @@ public class MoreFragment extends Fragment {
         for (int i = 0; i < 4; i++) { final int idx = i; editRow(c, MACRO_LABELS[i], repo.macroGoals[i],
                 v -> { repo.macroGoals[idx] = v; repo.saveDebounced(); }); }
         sp(c, 12);
-        Button pb = btn(c, "Use Macro Preset Calculator", color(R.color.accent_dark));
+        Button pb = btn(c, "Use Macro Preset Calculator", color(R.color.accent));
         pb.setOnClickListener(x -> showMacroPreset(c));
     }
 
@@ -506,14 +524,17 @@ public class MoreFragment extends Fragment {
         txt.addView(nm); txt.addView(mc);
         row.addView(txt);
 
-        Button rm = new Button(requireContext());
-        rm.setText("Delete"); ButtonStyles.delete(rm);
-        rm.setOnClickListener(x -> Dialogs.confirmDelete(requireContext(), "\"" + f.getName() + "\" from today's log", () -> {
-            List<Food> list = repo.foodLog.get(LocalDate.now());
-            if (list != null) { list.remove(f); if (list.isEmpty()) repo.foodLog.remove(LocalDate.now()); }
-            repo.saveAsync(); buildContent(c);
-        }));
-        row.addView(rm);
+        // Delete only appears in edit mode — the log stays clean while browsing.
+        if (foodEditMode) {
+            Button rm = new Button(requireContext());
+            rm.setText("Delete"); ButtonStyles.delete(rm);
+            rm.setOnClickListener(x -> Dialogs.confirmDelete(requireContext(), "\"" + f.getName() + "\" from today's log", () -> {
+                List<Food> list = repo.foodLog.get(LocalDate.now());
+                if (list != null) { list.remove(f); if (list.isEmpty()) repo.foodLog.remove(LocalDate.now()); }
+                repo.saveAsync(); buildContent(c);
+            }));
+            row.addView(rm);
+        }
         return row;
     }
 
@@ -589,35 +610,36 @@ public class MoreFragment extends Fragment {
 
     private void showMacroPreset(LinearLayout c) {
         String[] goals = {"Weight Loss","Muscle Building","Maintenance","Lean Bulk","Cut (aggressive)"};
-        String[] sexes = {"Male","Female"};
-        Spinner gs = new Spinner(requireContext()), ss = new Spinner(requireContext());
-        EditText bw = new EditText(requireContext()); bw.setHint("Current bodyweight (kg)");
+        Spinner gs = new Spinner(requireContext());
+        EditText bw = new EditText(requireContext()); bw.setHint("Current bodyweight (" + Units.unit() + ")");
         bw.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        // Locale.US: a comma decimal separator ("82,5") would be rejected by the
-        // field's digits filter and by the parse on Apply.
-        if (repo.startWeightKg > 0) bw.setText(String.format(java.util.Locale.US, "%.1f", repo.startWeightKg));
-        EditText gw = new EditText(requireContext()); gw.setHint("Goal bodyweight (kg)");
+        if (repo.startWeightKg > 0) bw.setText(Units.num(repo.startWeightKg));
+        EditText gw = new EditText(requireContext()); gw.setHint("Goal bodyweight (" + Units.unit() + ")");
         gw.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        if (repo.goalWeightKg > 0) gw.setText(String.format(java.util.Locale.US, "%.1f", repo.goalWeightKg));
+        if (repo.goalWeightKg > 0) gw.setText(Units.num(repo.goalWeightKg));
         ArrayAdapter<String> ga = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, goals);
         ga.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item); gs.setAdapter(ga);
-        ArrayAdapter<String> sa = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, sexes);
-        sa.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item); ss.setAdapter(sa);
         LinearLayout l = new LinearLayout(requireContext());
         l.setOrientation(LinearLayout.VERTICAL); l.setPadding(48, 24, 48, 0);
-        l.addView(tv("Goal")); l.addView(gs); l.addView(tv("Sex")); l.addView(ss);
-        l.addView(tv("Current bodyweight (kg)")); l.addView(bw);
-        l.addView(tv("Goal bodyweight (kg)")); l.addView(gw);
+        l.addView(tv("Goal")); l.addView(gs);
+        // Sex comes from the app-wide setting (asked on first launch).
+        TextView sexNote = tv("Calculating for: " + (repo.gender == null || repo.gender.isEmpty() ? "Male" : repo.gender)
+                + "  ·  change in Settings");
+        sexNote.setTextSize(11);
+        l.addView(sexNote);
+        l.addView(tv("Current bodyweight (" + Units.unit() + ")")); l.addView(bw);
+        l.addView(tv("Goal bodyweight (" + Units.unit() + ")")); l.addView(gw);
         new AlertDialog.Builder(requireContext()).setTitle("Macro Preset").setView(l)
             .setPositiveButton("Apply", (d, w) -> {
                 try {
-                    double b = parseD(bw.getText().toString());
+                    // Inputs are in the display unit; formulas and storage use kg
+                    double b = Units.toKg(parseD(bw.getText().toString()));
                     if (b <= 0) throw new NumberFormatException();
                     // Capture start (current) and goal weight for the Body goal bar.
                     repo.startWeightKg = b;
-                    double goalW = parseD(gw.getText().toString());
+                    double goalW = Units.toKg(parseD(gw.getText().toString()));
                     if (goalW > 0) repo.goalWeightKg = goalW;
-                    boolean male = ss.getSelectedItemPosition() == 0;
+                    boolean male = !"Female".equals(repo.gender);
                     String g = gs.getSelectedItem().toString();
                     double cal, pro, fat, carb;
                     switch (g) {
@@ -802,10 +824,99 @@ public class MoreFragment extends Fragment {
                 ((MainActivity) getActivity()).applyTheme(!lightModeOn);
             }
         });
-        dmRow.addView(dml); dmRow.addView(dms); c.addView(dmRow); sp(c, 12);
+        dmRow.addView(dml); dmRow.addView(dms); c.addView(dmRow); sp(c, 6);
+
+        // Sex — universal value used by the macro calculator and body calculations
+        LinearLayout sexRow = row(c);
+        TextView sexLbl = new TextView(requireContext());
+        sexLbl.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        sexLbl.setText("Sex"); sexLbl.setTextColor(themeColor(R.attr.colorTextPrimary)); sexLbl.setTextSize(14);
+        TextView sexVal = new TextView(requireContext());
+        sexVal.setText((repo.gender == null || repo.gender.isEmpty() ? "Not set" : repo.gender) + "  ›");
+        sexVal.setTextColor(color(R.color.accent)); sexVal.setTextSize(13);
+        sexRow.addView(sexLbl); sexRow.addView(sexVal);
+        sexRow.setOnClickListener(x -> new AlertDialog.Builder(requireContext())
+            .setTitle("Sex")
+            .setItems(new String[]{"Male", "Female"}, (d, which) -> {
+                repo.gender = which == 0 ? "Male" : "Female";
+                repo.saveAsync(); buildContent(c);
+            }).show());
+        c.addView(sexRow); sp(c, 6);
+
+        // Weight unit — display-only; kilograms are always what gets stored
+        LinearLayout unitRow = row(c);
+        TextView unitLbl = new TextView(requireContext());
+        unitLbl.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        unitLbl.setText("Show weights in pounds (lbs)");
+        unitLbl.setTextColor(themeColor(R.attr.colorTextPrimary)); unitLbl.setTextSize(14);
+        Switch unitSw = new Switch(requireContext());
+        unitSw.setChecked(repo.useLbs);
+        unitSw.setOnCheckedChangeListener((b, lbs) -> {
+            repo.useLbs = lbs;
+            com.ironpulse.data.Units.setUseLbs(lbs);
+            repo.saveAsync();
+        });
+        unitRow.addView(unitLbl); unitRow.addView(unitSw);
+        c.addView(unitRow); sp(c, 6);
+
+        // Daily workout reminder — only fires on days with unfinished exercises
+        LinearLayout remRow = row(c);
+        TextView remLbl = new TextView(requireContext());
+        remLbl.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        remLbl.setText("Workout day reminder");
+        remLbl.setTextColor(themeColor(R.attr.colorTextPrimary)); remLbl.setTextSize(14);
+        Switch remSw = new Switch(requireContext());
+        remSw.setChecked(repo.reminderEnabled);
+        remSw.setOnCheckedChangeListener((b, on) -> {
+            repo.reminderEnabled = on;
+            repo.saveAsync();
+            if (on) {
+                if (android.os.Build.VERSION.SDK_INT >= 33
+                        && !com.ironpulse.notify.Notifications.canPost(requireContext()))
+                    notifPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS);
+                com.ironpulse.notify.Reminders.schedule(requireContext(),
+                        repo.reminderHour, repo.reminderMinute);
+            } else {
+                com.ironpulse.notify.Reminders.cancel(requireContext());
+            }
+            buildContent(c); // show/hide the time row
+        });
+        remRow.addView(remLbl); remRow.addView(remSw);
+        c.addView(remRow); sp(c, 6);
+
+        if (repo.reminderEnabled) {
+            LinearLayout timeRow = row(c);
+            TextView timeLbl = new TextView(requireContext());
+            timeLbl.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            timeLbl.setText("Reminder time");
+            timeLbl.setTextColor(themeColor(R.attr.colorTextPrimary)); timeLbl.setTextSize(14);
+            TextView timeVal = new TextView(requireContext());
+            timeVal.setText(String.format(java.util.Locale.US, "%02d:%02d  ›",
+                    repo.reminderHour, repo.reminderMinute));
+            timeVal.setTextColor(color(R.color.accent)); timeVal.setTextSize(13);
+            timeRow.addView(timeLbl); timeRow.addView(timeVal);
+            timeRow.setOnClickListener(x -> new android.app.TimePickerDialog(requireContext(),
+                (picker, h, m) -> {
+                    repo.reminderHour = h; repo.reminderMinute = m;
+                    repo.saveAsync();
+                    com.ironpulse.notify.Reminders.schedule(requireContext(), h, m);
+                    buildContent(c);
+                }, repo.reminderHour, repo.reminderMinute, true).show());
+            c.addView(timeRow); sp(c, 6);
+        }
+        sp(c, 6);
         infoRow(c, "Data location", "App internal storage");
         infoRow(c, "Auto-save", "On every change");
         infoRow(c, "Exercise schedule", "Every 7 days from added date"); sp(c, 16);
+
+        // Backup — everything lives in internal storage, so give users a way out
+        Button exp = btn(c, "Export Data (backup)", color(R.color.accent));
+        exp.setOnClickListener(x -> exportData());
+        Button imp = btn(c, "Import Data (restore backup)", color(R.color.accent));
+        imp.setOnClickListener(x ->
+                importPicker.launch(new String[]{"application/zip", "application/octet-stream"}));
+        sp(c, 8);
+
         Button clr = btn(c, "Clear All Data", color(R.color.danger));
         clr.setOnClickListener(x -> new AlertDialog.Builder(requireContext())
             .setTitle("Clear All Data")
@@ -821,6 +932,79 @@ public class MoreFragment extends Fragment {
                     .setNegativeButton("Cancel", null).show()
             )
             .setNegativeButton("Cancel", null).show());
+    }
+
+    // ── Backup / restore ─────────────────────────────────────────────────────
+
+    /** Zips every data file into the cache dir and hands it to the share sheet. */
+    private void exportData() {
+        try {
+            java.io.File zip = new java.io.File(requireContext().getCacheDir(),
+                    "ironpulse-backup-" + LocalDate.now() + ".zip");
+            int added = 0;
+            try (java.util.zip.ZipOutputStream zos =
+                         new java.util.zip.ZipOutputStream(new java.io.FileOutputStream(zip))) {
+                for (String name : AppRepository.DATA_FILES) {
+                    java.io.File f = new java.io.File(requireContext().getFilesDir(), name);
+                    if (!f.exists()) continue;
+                    zos.putNextEntry(new java.util.zip.ZipEntry(name));
+                    try (java.io.FileInputStream in = new java.io.FileInputStream(f)) {
+                        byte[] buf = new byte[8192]; int n;
+                        while ((n = in.read(buf)) > 0) zos.write(buf, 0, n);
+                    }
+                    zos.closeEntry();
+                    added++;
+                }
+            }
+            if (added == 0) {
+                Toast.makeText(requireContext(), "Nothing to export yet", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            android.net.Uri uri = androidx.core.content.FileProvider.getUriForFile(
+                    requireContext(), "com.ironpulse.fileprovider", zip);
+            android.content.Intent send = new android.content.Intent(android.content.Intent.ACTION_SEND)
+                    .setType("application/zip")
+                    .putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                    .addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(android.content.Intent.createChooser(send, "Export IronPulse data"));
+        } catch (Exception e) {
+            Toast.makeText(requireContext(), "Export failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void confirmImport(android.net.Uri uri) {
+        Dialogs.confirm(requireContext(), "Import data",
+                "Importing replaces your current data with the backup. Continue?",
+                "Import", () -> importData(uri));
+    }
+
+    private void importData(android.net.Uri uri) {
+        Set<String> known = new HashSet<>(Arrays.asList(AppRepository.DATA_FILES));
+        int restored = 0;
+        try (java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(
+                requireContext().getContentResolver().openInputStream(uri))) {
+            java.util.zip.ZipEntry e;
+            while ((e = zis.getNextEntry()) != null) {
+                // Whitelist match also guards against zip-slip paths
+                if (!known.contains(e.getName())) continue;
+                java.io.File target = new java.io.File(requireContext().getFilesDir(), e.getName());
+                try (java.io.FileOutputStream out = new java.io.FileOutputStream(target)) {
+                    byte[] buf = new byte[8192]; int n;
+                    while ((n = zis.read(buf)) > 0) out.write(buf, 0, n);
+                }
+                restored++;
+            }
+        } catch (Exception ex) {
+            Toast.makeText(requireContext(), "Import failed — not a valid IronPulse backup", Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (restored == 0) {
+            Toast.makeText(requireContext(), "No IronPulse data found in that file", Toast.LENGTH_LONG).show();
+            return;
+        }
+        Toast.makeText(requireContext(), "Backup imported", Toast.LENGTH_SHORT).show();
+        AppRepository.invalidate();
+        requireActivity().recreate(); // every screen rebuilds against the imported data
     }
 
     private void infoRow(LinearLayout c, String label, String value) {
@@ -858,9 +1042,8 @@ public class MoreFragment extends Fragment {
     }
     private Button btn(LinearLayout c, String t, int col) {
         Button b = new Button(requireContext()); b.setText(t);
-        if (col == color(R.color.danger))      b.setBackgroundResource(R.drawable.btn_danger);
-        else if (col == color(R.color.accent_dark)) b.setBackgroundResource(R.drawable.btn_accent_dark);
-        else                                   b.setBackgroundResource(R.drawable.btn_primary);
+        if (col == color(R.color.danger)) b.setBackgroundResource(R.drawable.btn_danger);
+        else                              b.setBackgroundResource(R.drawable.btn_primary);
         b.setTextColor(color(R.color.white));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -877,12 +1060,12 @@ public class MoreFragment extends Fragment {
         lp.setMargins(0, 0, 0, 6); r.setLayoutParams(lp);
         return r;
     }
+    /** Normalises a PR weight input (current display unit) to the stored kg string. */
     private String nw(String raw) {
-        if (raw==null||raw.trim().isEmpty()) return "";
-        String t = raw.trim().replaceAll("(?i)\\s*(kgs?|lbs?)\\s*$","").trim();
-        if (t.matches("\\d+,\\d+")) t = t.replace(",",".");
-        t = t.replaceAll("[^0-9.]","").trim();
-        return t.isEmpty() ? "" : t;
+        double kg = Units.parseToKg(raw);
+        if (kg <= 0) return "";
+        double r = Math.round(kg * 100) / 100.0;
+        return r == Math.floor(r) ? String.valueOf((long) r) : String.valueOf(r);
     }
     private int pi(String s, int fb) { try { return Math.max(1,Integer.parseInt(s.trim())); } catch(Exception e) { return fb; } }
 }

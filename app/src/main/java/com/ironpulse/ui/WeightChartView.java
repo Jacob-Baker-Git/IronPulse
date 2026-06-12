@@ -5,6 +5,7 @@ import android.graphics.*;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
+import com.ironpulse.data.Units;
 import com.ironpulse.model.BodyWeightEntry;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -134,8 +135,9 @@ public class WeightChartView extends View {
         float sp = chartW / (VISIBLE_POINTS - 1);
         int n = data.size();
 
-        double minW = data.stream().mapToDouble(BodyWeightEntry::getWeightKg).min().orElse(0);
-        double maxW = data.stream().mapToDouble(BodyWeightEntry::getWeightKg).max().orElse(1);
+        // All chart math happens in the display unit so axis ticks stay round
+        double minW = data.stream().mapToDouble(e -> Units.toDisplay(e.getWeightKg())).min().orElse(0);
+        double maxW = data.stream().mapToDouble(e -> Units.toDisplay(e.getWeightKg())).max().orElse(1);
         double spread = maxW - minW;
         double pad = Math.max(1.5, spread * 0.2);
         minW -= pad; maxW += pad;
@@ -157,7 +159,7 @@ public class WeightChartView extends View {
         float[] ys = new float[n];
         for (int i = 0; i < n; i++) {
             xs[i] = padL + (i - graphStartF) * sp;
-            ys[i] = yPos(data.get(i).getWeightKg(), minW, range, padT, chartH);
+            ys[i] = yPos(Units.toDisplay(data.get(i).getWeightKg()), minW, range, padT, chartH);
         }
 
         // Line + gradient fill (clipped to the plot area so it runs to the edges cleanly)
@@ -187,16 +189,16 @@ public class WeightChartView extends View {
             canvas.drawCircle(xs[i], ys[i], 6f, dotPaint);
             labelPaint.setTextAlign(Paint.Align.CENTER);
             labelPaint.setTextSize(32f);
-            canvas.drawText(String.format("%.1f", data.get(i).getWeightKg()), xs[i], ys[i] - 14, labelPaint);
+            canvas.drawText(String.format("%.1f", Units.toDisplay(data.get(i).getWeightKg())), xs[i], ys[i] - 14, labelPaint);
             labelPaint.setTextSize(28f);
             canvas.drawText(data.get(i).getDate().format(fmt), xs[i], padT + chartH + 32, labelPaint);
         }
 
         // Trend across the range currently visible in the log
         int fv = Math.max(0, Math.round(visFirst)), lv = Math.min(n - 1, Math.round(visLast));
-        double diff = data.get(lv).getWeightKg() - data.get(fv).getWeightKg();
-        String trend = diff > 0.05 ? String.format("▲ +%.1f kg", diff)
-                     : diff < -0.05 ? String.format("▼ %.1f kg", diff) : "→ stable";
+        double diff = Units.toDisplay(data.get(lv).getWeightKg() - data.get(fv).getWeightKg());
+        String trend = diff > 0.05 ? String.format("▲ +%.1f %s", diff, Units.unit())
+                     : diff < -0.05 ? String.format("▼ %.1f %s", diff, Units.unit()) : "→ stable";
         trendPaint.setColor(diff > 0.05 ? 0xFFE64444 : diff < -0.05 ? 0xFF22C882 : 0xFFFFB937);
         trendPaint.setTextAlign(Paint.Align.RIGHT);
         canvas.drawText(trend, w - padR, padT - 8, trendPaint);

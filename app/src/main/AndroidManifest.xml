@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <application
         android:allowBackup="true"
         android:fullBackupContent="@xml/backup_rules"
@@ -22,5 +24,25 @@
         <activity android:name=".ui.ExerciseDetailActivity"
             android:screenOrientation="portrait"
             android:parentActivityName=".ui.MainActivity"/>
+
+        <!-- Shares backup zips with whatever app the user exports to -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="com.ironpulse.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths"/>
+        </provider>
+
+        <!-- Daily workout reminder + rest-over alert -->
+        <receiver android:name=".notify.ReminderReceiver" android:exported="false"/>
+        <receiver android:name=".notify.RestAlarmReceiver" android:exported="false"/>
+        <receiver android:name=".notify.BootReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

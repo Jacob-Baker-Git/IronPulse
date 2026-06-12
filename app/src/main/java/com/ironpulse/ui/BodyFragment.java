@@ -11,6 +11,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.ironpulse.R;
 import com.ironpulse.data.AppRepository;
+import com.ironpulse.data.Units;
 import com.ironpulse.model.BodyWeightEntry;
 import java.time.LocalDate;
 import java.util.*;
@@ -146,7 +147,7 @@ public class BodyFragment extends Fragment {
         // Future-dated entries would read "-7 days ago" — show the date instead
         String when = ago == 0 ? "today" : ago == 1 ? "yesterday"
                 : ago > 1 ? ago + " days ago" : formatDate(latest.getDate());
-        lastWeighedText.setText(String.format("Last: %.1f kg — %s", latest.getWeightKg(), when));
+        lastWeighedText.setText("Last: " + Units.fmt(latest.getWeightKg()) + " — " + when);
 
         buildGoalBar();
         if (adapter != null) adapter.notifyDataSetChanged();
@@ -195,11 +196,11 @@ public class BodyFragment extends Fragment {
         goalContainer.removeAllViews();
 
         double goal = repo.goalWeightKg;
+        goalContainer.setVisibility(View.VISIBLE);
         if (goal <= 0) {
-            goalContainer.setVisibility(View.GONE);
+            buildGoalPlaceholder();
             return;
         }
-        goalContainer.setVisibility(View.VISIBLE);
 
         double start = repo.startWeightKg > 0 ? repo.startWeightKg
                 : (sortedAsc.isEmpty() ? 0 : sortedAsc.get(0).getWeightKg());
@@ -262,8 +263,8 @@ public class BodyFragment extends Fragment {
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         llp.setMargins(0, 8, 0, 0); labels.setLayoutParams(llp);
 
-        labels.addView(label(String.format("Start %.1f kg", start), 1f, Gravity.START, themeColor(R.attr.colorTextMuted)));
-        labels.addView(label(String.format("Goal %.1f kg", goal), 1f, Gravity.END, color(R.color.accent)));
+        labels.addView(label("Start " + Units.fmt(start), 1f, Gravity.START, themeColor(R.attr.colorTextMuted)));
+        labels.addView(label("Goal " + Units.fmt(goal), 1f, Gravity.END, color(R.color.accent)));
         goalContainer.addView(labels);
 
         // Current weight caption
@@ -271,11 +272,46 @@ public class BodyFragment extends Fragment {
         double remaining = current - goal;
         String dir = (start - goal) >= 0 ? "to lose" : "to gain";
         now.setText(Math.abs(remaining) < 0.05
-                ? String.format("Now %.1f kg — goal reached!", current)
-                : String.format("Now %.1f kg  ·  %.1f kg %s", current, Math.abs(remaining), dir));
+                ? "Now " + Units.fmt(current) + " — goal reached!"
+                : "Now " + Units.fmt(current) + "  ·  " + Units.fmt(Math.abs(remaining)) + " " + dir);
         now.setTextColor(themeColor(R.attr.colorTextMuted)); now.setTextSize(11);
         now.setPadding(0, 6, 0, 0);
         goalContainer.addView(now);
+    }
+
+    /** Shown until a goal exists: empty track + how to set one up. */
+    private void buildGoalPlaceholder() {
+        LinearLayout titleRow = new LinearLayout(requireContext());
+        titleRow.setOrientation(LinearLayout.HORIZONTAL);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = new TextView(requireContext());
+        title.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        title.setText("GOAL PROGRESS");
+        title.setTextColor(themeColor(R.attr.colorTextMuted)); title.setTextSize(11);
+        title.setLetterSpacing(0.08f);
+        TextView pct = new TextView(requireContext());
+        pct.setText("—");
+        pct.setTextColor(themeColor(R.attr.colorTextMuted)); pct.setTextSize(18);
+        pct.setTypeface(null, android.graphics.Typeface.BOLD);
+        titleRow.addView(title); titleRow.addView(pct);
+        goalContainer.addView(titleRow);
+
+        int trackH = dp(18);
+        GradientDrawable trackBg = new GradientDrawable();
+        trackBg.setCornerRadius(trackH / 2f);
+        trackBg.setColor(themeColor(R.attr.streakTrack));
+        View track = new View(requireContext());
+        track.setBackground(trackBg);
+        LinearLayout.LayoutParams tlp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, trackH);
+        tlp.setMargins(0, 8, 0, 0); track.setLayoutParams(tlp);
+        goalContainer.addView(track);
+
+        TextView hint = new TextView(requireContext());
+        hint.setText("To use the goal bar, enter your weights in More → Macros → \"Use Macro Preset Calculator\".");
+        hint.setTextColor(themeColor(R.attr.colorTextMuted)); hint.setTextSize(11);
+        hint.setPadding(0, 6, 0, 0);
+        goalContainer.addView(hint);
     }
 
     private TextView label(String text, float weight, int gravity, int color) {
@@ -335,7 +371,7 @@ public class BodyFragment extends Fragment {
             h.date.setText(formatDate(e.getDate()));
 
             double hm = repo.heightCm / 100.0;
-            StringBuilder val = new StringBuilder(String.format("%.1f kg", e.getWeightKg()));
+            StringBuilder val = new StringBuilder(Units.fmt(e.getWeightKg()));
             if (hm > 0) {
                 double bmi = e.getWeightKg() / (hm * hm);
                 String cat = bmi < 18.5 ? "Underweight" : bmi < 25 ? "Normal" : bmi < 30 ? "Overweight" : "Obese";
@@ -386,22 +422,20 @@ public class BodyFragment extends Fragment {
     private void showWeightDialog(BodyWeightEntry existing) {
         boolean isEdit = existing != null;
         EditText df = new EditText(requireContext());
-        df.setHint("YYYY-MM-DD");
-        df.setInputType(android.text.InputType.TYPE_CLASS_DATETIME | android.text.InputType.TYPE_DATETIME_VARIATION_DATE);
         df.setText(isEdit ? existing.getDate().toString() : LocalDate.now().toString());
+        Dialogs.attachDatePicker(df);
 
         EditText wf = new EditText(requireContext());
-        wf.setHint("Weight (kg)  e.g. 82.5");
+        wf.setHint("Weight (" + Units.unit() + ")");
         wf.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        // Locale.US: a comma decimal ("82,5") can be mangled by the digits filter
-        if (isEdit) wf.setText(String.format(java.util.Locale.US, "%.1f", existing.getWeightKg()));
+        if (isEdit) wf.setText(Units.num(existing.getWeightKg()));
 
         LinearLayout l = new LinearLayout(requireContext());
         l.setOrientation(LinearLayout.VERTICAL); l.setPadding(48, 24, 48, 8);
         TextView dateLbl = new TextView(requireContext());
         dateLbl.setText("Date"); dateLbl.setTextColor(themeColor(R.attr.colorTextPrimary));
         TextView weightLbl = new TextView(requireContext());
-        weightLbl.setText("Weight (kg)"); weightLbl.setTextColor(themeColor(R.attr.colorTextPrimary));
+        weightLbl.setText("Weight (" + Units.unit() + ")"); weightLbl.setTextColor(themeColor(R.attr.colorTextPrimary));
         l.addView(dateLbl); l.addView(df);
         l.addView(weightLbl); l.addView(wf);
 
@@ -411,7 +445,7 @@ public class BodyFragment extends Fragment {
             .setPositiveButton("Save", (d, w) -> {
                 try {
                     LocalDate date = LocalDate.parse(df.getText().toString().trim());
-                    double kg = Double.parseDouble(wf.getText().toString().trim().replace(",", "."));
+                    double kg = Units.parseToKg(wf.getText().toString());
                     if (kg <= 0 || kg > 700) throw new NumberFormatException();
                     Runnable commit = () -> {
                         if (isEdit) repo.bodyEntries.remove(existing);
@@ -425,8 +459,8 @@ public class BodyFragment extends Fragment {
                         if (e2.getDate().equals(date) && e2 != existing) { dup = e2; break; }
                     if (dup != null) {
                         Dialogs.confirm(requireContext(), "Replace entry",
-                                String.format("You already logged %.1f kg on %s. Replace it with %.1f kg?",
-                                        dup.getWeightKg(), formatDate(date), kg), "Replace", commit);
+                                String.format("You already logged %s on %s. Replace it with %s?",
+                                        Units.fmt(dup.getWeightKg()), formatDate(date), Units.fmt(kg)), "Replace", commit);
                     } else {
                         commit.run();
                     }

@@ -10,6 +10,12 @@ import java.util.*;
 import java.util.concurrent.*;
 
 public class AppRepository {
+    /** Every JSON file the app persists — used by save, clear, and backup. */
+    public static final String[] DATA_FILES = {
+            "exercises.json","body.json","records.json","cardio.json","setlogs.json",
+            "rest_days.json","custom_splits.json","completed.json","foods.json",
+            "foodlog.json","prefs.json"};
+
     private static AppRepository instance;
     private final Context context;
     private final Gson gson;
@@ -35,6 +41,14 @@ public class AppRepository {
     public double startWeightKg = 0;
     public double goalWeightKg = 0;
     public boolean darkMode = true;
+    /** "Male" / "Female" — asked once on first launch, changeable in Settings. */
+    public String gender = "";
+    /** Show weights in pounds instead of kilograms (kg is always stored). */
+    public boolean useLbs = false;
+    /** Daily workout reminder (fires only on days with unfinished exercises). */
+    public boolean reminderEnabled = false;
+    public int reminderHour = 18;
+    public int reminderMinute = 0;
 
     private AppRepository(Context ctx) {
         this.context = ctx.getApplicationContext();
@@ -49,6 +63,9 @@ public class AppRepository {
         if (instance == null) instance = new AppRepository(ctx);
         return instance;
     }
+
+    /** Drops the singleton so the next get() re-reads from disk (used after import). */
+    public static void invalidate() { instance = null; }
 
     public List<ExerciseData> getExercisesForDate(LocalDate date) {
         List<ExerciseData> result = new ArrayList<>();
@@ -217,6 +234,11 @@ public class AppRepository {
         prefsSnap.put("startWeightKg", startWeightKg);
         prefsSnap.put("goalWeightKg", goalWeightKg);
         prefsSnap.put("darkMode", darkMode);
+        prefsSnap.put("gender", gender);
+        prefsSnap.put("useLbs", useLbs);
+        prefsSnap.put("reminderEnabled", reminderEnabled);
+        prefsSnap.put("reminderHour", reminderHour);
+        prefsSnap.put("reminderMinute", reminderMinute);
 
         ioExecutor.execute(() -> {
             saveJson("exercises.json", exSnap);
@@ -292,9 +314,15 @@ public class AppRepository {
             Object sw=prefs.get("startWeightKg"); if (sw instanceof Number) startWeightKg=((Number)sw).doubleValue();
             Object gw=prefs.get("goalWeightKg"); if (gw instanceof Number) goalWeightKg=((Number)gw).doubleValue();
             Object d=prefs.get("darkMode"); if (d instanceof Boolean) darkMode=(Boolean)d;
+            Object g=prefs.get("gender"); if (g instanceof String) gender=(String)g;
+            Object u=prefs.get("useLbs"); if (u instanceof Boolean) useLbs=(Boolean)u;
+            Object re=prefs.get("reminderEnabled"); if (re instanceof Boolean) reminderEnabled=(Boolean)re;
+            Object rh=prefs.get("reminderHour"); if (rh instanceof Number) reminderHour=((Number)rh).intValue();
+            Object rm=prefs.get("reminderMinute"); if (rm instanceof Number) reminderMinute=((Number)rm).intValue();
             Object mg=prefs.get("macroGoals"); if (mg instanceof List) { List<?> l=(List<?>)mg; for (int i=0;i<Math.min(4,l.size());i++) macroGoals[i]=String.valueOf(l.get(i)); }
             Object ma=prefs.get("macroActual"); if (ma instanceof List) { List<?> l=(List<?>)ma; for (int i=0;i<Math.min(4,l.size());i++) macroActual[i]=String.valueOf(l.get(i)); }
         }
+        Units.setUseLbs(useLbs);
         if (records.isEmpty()) {
             records.add(new RecordData("Squat",""));
             records.add(new RecordData("Bench Press",""));
@@ -310,8 +338,8 @@ public class AppRepository {
         foodLog.clear(); savedFoods.clear();
         Arrays.fill(macroGoals,""); Arrays.fill(macroActual,"");
         startWeightKg = 0; goalWeightKg = 0;
-        for (String f:new String[]{"exercises.json","body.json","records.json","cardio.json","setlogs.json","rest_days.json","completed.json","prefs.json","custom_splits.json","foods.json","foodlog.json"})
-            new File(context.getFilesDir(),f).delete();
+        gender = ""; // re-asked on next launch
+        for (String f : DATA_FILES) new File(context.getFilesDir(),f).delete();
     }
 
     /** Sum of a macro across today's logged foods. idx: 0=cals 1=protein 2=carbs 3=fats */

@@ -156,6 +156,7 @@ public class CardioFragment extends Fragment {
 
         EditText df = new EditText(requireContext());
         df.setText(existing != null ? existing.getDate().toString() : LocalDate.now().toString());
+        Dialogs.attachDatePicker(df);
         EditText distF = new EditText(requireContext());
         distF.setHint("Distance (km)");
         distF.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
@@ -170,7 +171,7 @@ public class CardioFragment extends Fragment {
 
         int tc = themeColor(R.attr.colorTextPrimary);
         l.addView(lbl("Type", tc));      l.addView(ts);
-        l.addView(lbl("Date (YYYY-MM-DD)", tc)); l.addView(df);
+        l.addView(lbl("Date  ·  tap to pick", tc)); l.addView(df);
         l.addView(lbl("Distance (km)", tc)); l.addView(distF);
         l.addView(lbl("Duration (minutes)", tc)); l.addView(durF);
         l.addView(lbl("Notes", tc));     l.addView(nf);

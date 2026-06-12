@@ -14,6 +14,7 @@ import com.google.android.material.chip.Chip;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.ironpulse.R;
 import com.ironpulse.data.AppRepository;
+import com.ironpulse.data.Units;
 import com.ironpulse.model.ExerciseData;
 
 import java.time.*;
@@ -130,7 +131,6 @@ public class WorkoutFragment extends Fragment {
         editBtn.setOnClickListener(x -> {
             editMode = !editMode;
             editBtn.setText(editMode ? "Done" : "Edit");
-            editBtn.setBackgroundResource(editMode ? R.drawable.btn_danger : R.drawable.btn_primary);
             adapter.notifyDataSetChanged();
         });
 
@@ -451,9 +451,7 @@ public class WorkoutFragment extends Fragment {
         public void onBindViewHolder(@NonNull VH h, int pos) {
             ExerciseData ex = items.get(pos);
             h.name.setText(ex.getName());
-            String w = ex.isBodyweight() ? "BW"
-                    : (ex.getWeightKg() == Math.floor(ex.getWeightKg())
-                       ? (int)ex.getWeightKg() + " kg" : ex.getWeightKg() + " kg");
+            String w = ex.isBodyweight() ? "BW" : Units.fmt(ex.getWeightKg());
             h.stats.setText(w + "  |  " + ex.getReps() + "  |  " + ex.getRestSeconds() + "s rest");
 
             // Muscle group pill
@@ -561,6 +559,7 @@ public class WorkoutFragment extends Fragment {
                  sF    = dlg.findViewById(R.id.field_sets),
                  rF    = dlg.findViewById(R.id.field_reps),
                  restF = dlg.findViewById(R.id.field_rest);
+        wF.setHint("Weight (" + Units.unit() + " or BW)");
         // Fields start empty (hints show the defaults); pi() falls back to
         // 3 sets / 10 reps / 90s rest if the user leaves them blank.
 
@@ -570,7 +569,7 @@ public class WorkoutFragment extends Fragment {
                 if (nm.isEmpty()) return;
                 Runnable add = () -> {
                     repo.exercises.add(new ExerciseData(nm,
-                            wF.getText().toString().trim(),
+                            Units.inputToKgString(wF.getText().toString()),
                             pi(sF.getText().toString(), 3) + "x" + pi(rF.getText().toString(), 10),
                             pi(restF.getText().toString(), 90), selectedDate));
                     repo.saveAsync();
@@ -596,15 +595,16 @@ public class WorkoutFragment extends Fragment {
                  sF    = dlg.findViewById(R.id.field_sets),
                  rF    = dlg.findViewById(R.id.field_reps),
                  restF = dlg.findViewById(R.id.field_rest);
+        wF.setHint("Weight (" + Units.unit() + " or BW)");
         nameF.setText(ex.getName()); nameF.setEnabled(false);
-        wF.setText(ex.getWeight());
+        wF.setText(ex.isBodyweight() ? "" : Units.num(ex.getWeightKg()));
         sF.setText(rp.length > 0 ? rp[0] : "3");
         rF.setText(rp.length > 1 ? rp[1] : "10");
         restF.setText(String.valueOf(ex.getRestSeconds()));
 
         new AlertDialog.Builder(requireContext()).setTitle("Edit: " + ex.getName()).setView(dlg)
             .setPositiveButton("Save", (d, w) -> {
-                ex.setWeight(wF.getText().toString().trim());
+                ex.setWeight(Units.inputToKgString(wF.getText().toString()));
                 ex.setReps(pi(sF.getText().toString(), 3) + "x" + pi(rF.getText().toString(), 10));
                 ex.setRestSeconds(pi(restF.getText().toString(), 90));
                 repo.saveAsync(); refreshExercises();
@@ -708,7 +708,7 @@ public class WorkoutFragment extends Fragment {
         for (ExerciseData ex : exercises) {
             TextView preview = new TextView(requireContext());
             preview.setText("• " + ex.getName() + "  " + ex.getReps()
-                    + (ex.isBodyweight() ? "  BW" : "  " + ex.getWeightKg() + "kg"));
+                    + (ex.isBodyweight() ? "  BW" : "  " + Units.fmt(ex.getWeightKg())));
             preview.setTextColor(0xFF72889E); preview.setTextSize(12);
             preview.setPadding(0, 2, 0, 2);
             l.addView(preview);

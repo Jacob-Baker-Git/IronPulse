@@ -6,7 +6,11 @@ import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import com.ironpulse.R;
 import com.ironpulse.data.AppRepository;
+import com.ironpulse.data.Units;
 import com.ironpulse.model.*;
+import com.ironpulse.notify.Notifications;
+import com.ironpulse.notify.RestAlarmReceiver;
+import com.ironpulse.notify.RestTimerState;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -75,6 +79,8 @@ public class ExerciseDetailActivity extends AppCompatActivity {
         pauseBtn     = findViewById(R.id.btn_pause);
 
         findViewById(R.id.btn_back).setOnClickListener(v -> finish());
+        ((TextView) findViewById(R.id.weight_field_label))
+                .setText("Weight (" + Units.unit() + " or BW)");
 
         if (exercise == null) {
             titleView.setText("Exercise not found");
@@ -116,43 +122,65 @@ public class ExerciseDetailActivity extends AppCompatActivity {
                 paused = true;
                 restCountDown.cancel();
                 restCountDown = null;
+                RestTimerState.clear();
+                cancelRestAlarm();
+                cancelRestNotification();
+                setKeepScreenOn(false);
                 pauseBtn.setText("Resume");
             } else if (paused && remainingSec > 0) {
                 paused = false;
                 pauseBtn.setText("Pause");
+                RestTimerState.start(exercise.getName(), remainingSec);
+                postRestNotification();
+                scheduleRestAlarm();
                 startCountdown();
             }
         });
+
+        // A rest started earlier is anchored to wall-clock time — returning to
+        // this screen (or reopening the app) picks it up where it really is.
+        if (isToday && RestTimerState.isActiveFor(exercise.getName())) {
+            remainingSec = RestTimerState.remainingSeconds();
+            paused = false;
+            pauseBtn.setText("Pause");
+            pauseBtn.setVisibility(android.view.View.VISIBLE);
+            timerView.setTextColor(getResources().getColor(R.color.accent_2, getTheme()));
+            startCountdown();
+        }
     }
 
     private void refresh() {
         titleView.setText(exercise.getName());
-        String w = exercise.isBodyweight() ? "Bodyweight"
-                : (exercise.getWeightKg() == Math.floor(exercise.getWeightKg())
-                   ? (int)exercise.getWeightKg() + " kg"
-                   : exercise.getWeightKg() + " kg");
+        String w = exercise.isBodyweight() ? "Bodyweight" : Units.fmt(exercise.getWeightKg());
 
         statsView.setText(w + "  ·  " + exercise.getReps()
                 + "  ·  " + exercise.getRestSeconds() + "s"
                 + "  ·  " + loggedSets + "/" + targetSets + " sets");
 
-        // Progressive overload
-        LocalDate lastWeek = date.minusDays(7);
-        List<SetLog> prev = repo.setLogs.stream()
+        // Progressive overload: compare against the most recent earlier session,
+        // however long ago it was — skipping a week must not lose the reference.
+        LocalDate prevDate = repo.setLogs.stream()
                 .filter(s -> s.getExerciseName().equals(exercise.getName())
-                          && s.getDate().equals(lastWeek))
-                .collect(Collectors.toList());
-        if (!prev.isEmpty()) {
+                          && s.getDate().isBefore(date))
+                .map(SetLog::getDate)
+                .max(Comparator.naturalOrder()).orElse(null);
+        if (prevDate != null) {
+            List<SetLog> prev = repo.setLogs.stream()
+                    .filter(s -> s.getExerciseName().equals(exercise.getName())
+                              && s.getDate().equals(prevDate))
+                    .collect(Collectors.toList());
             SetLog best = prev.stream()
                     .max(Comparator.comparingDouble(SetLog::volume))
                     .orElse(prev.get(0));
-            prevBestView.setText("↑ Last week: " + best.formatDisplay());
+            long daysAgo = java.time.temporal.ChronoUnit.DAYS.between(prevDate, date);
+            String when = daysAgo == 1 ? "yesterday" : daysAgo + " days ago";
+            prevBestView.setText("↑ Last session (" + when + "): " + best.formatDisplay());
         } else {
-            prevBestView.setText("• First time on this date");
+            prevBestView.setText("• First session — log your sets to start tracking");
         }
 
         if (weightField.getText().toString().isEmpty())
-            weightField.setText(exercise.isBodyweight() ? "BW" : exercise.getWeight());
+            weightField.setText(exercise.isBodyweight() ? "BW" : Units.num(exercise.getWeightKg()));
         if (repsField.getText().toString().isEmpty()) {
             String[] rp = exercise.getReps() == null ? new String[]{"3"} : exercise.getReps().split("x");
             repsField.setText(rp.length > 1 ? rp[1] : "10");
@@ -184,21 +212,26 @@ public class ExerciseDetailActivity extends AppCompatActivity {
         boolean isBW = wt.equalsIgnoreCase("BW") || wt.equalsIgnoreCase("bodyweight") || wt.isEmpty();
         double  wKg  = 0;
         if (!isBW) {
-            // Accept comma decimals ("82,5") — common on European keyboards
-            try { wKg = Double.parseDouble(wt.replace(',', '.').replaceAll("[^0-9.]", "")); }
-            catch (Exception e) { wKg = exercise.getWeightKg(); }
+            // Input is in the current display unit; storage is always kg
+            wKg = Units.parseToKg(wt);
+            if (wKg <= 0) wKg = exercise.getWeightKg();
         }
         int reps = pi(repsField.getText().toString(), 10);
 
         loggedSets++;
         repo.setLogs.add(new SetLog(date, exercise.getName(), loggedSets,
                 wKg, reps, isBW || exercise.isBodyweight()));
+        checkForNewPR(wKg, isBW || exercise.isBodyweight());
         repo.saveAsync();
 
         if (loggedSets >= targetSets) {
             // All sets done (markComplete saves internally)
             repo.markComplete(date, exercise, true);
             cancelTimer();
+            RestTimerState.clear();
+            cancelRestAlarm();
+            cancelRestNotification();
+            setKeepScreenOn(false);
             timerView.setText("✓ All sets done!");
             timerView.setTextColor(getResources().getColor(R.color.accent, getTheme()));
             logSetBtn.setEnabled(false);
@@ -210,10 +243,35 @@ public class ExerciseDetailActivity extends AppCompatActivity {
         refresh();
     }
 
+    /**
+     * Auto-detects PRs: if this set's weight beats the stored record for the
+     * same lift (matched by name, case-insensitive), update it and celebrate.
+     */
+    private void checkForNewPR(double wKg, boolean isBW) {
+        if (isBW || wKg <= 0) return;
+        for (RecordData r : repo.records) {
+            if (!r.getName().equalsIgnoreCase(exercise.getName())) continue;
+            double prev = 0;
+            try { prev = Double.parseDouble(r.getWeight().replaceAll("[^0-9.]", "")); }
+            catch (Exception ignored) {}
+            if (wKg > prev) {
+                r.setWeight(wKg == Math.floor(wKg)
+                        ? String.valueOf((int) wKg) : String.valueOf(wKg));
+                Toast.makeText(this, "🎉 New PR: " + exercise.getName()
+                        + " " + Units.fmt(wKg) + "!", Toast.LENGTH_LONG).show();
+            }
+            return; // only one record per lift
+        }
+    }
+
     private void startRestTimer(int totalSec) {
         cancelTimer();
         paused = false;
         remainingSec = totalSec;
+        RestTimerState.start(exercise.getName(), totalSec);
+        maybeRequestNotifPermission();
+        postRestNotification();
+        scheduleRestAlarm();
         pauseBtn.setText("Pause");
         pauseBtn.setVisibility(android.view.View.VISIBLE);
         timerView.setTextColor(getResources().getColor(R.color.accent_2, getTheme()));
@@ -223,6 +281,7 @@ public class ExerciseDetailActivity extends AppCompatActivity {
 
     /** (Re)starts the countdown from {@link #remainingSec} — used on start and resume. */
     private void startCountdown() {
+        setKeepScreenOn(true); // don't let the screen lock mid-rest
         restCountDown = new CountDownTimer(remainingSec * 1000L, 500) {
             @Override public void onTick(long remaining) {
                 remainingSec = (int)(remaining / 1000);
@@ -231,6 +290,10 @@ public class ExerciseDetailActivity extends AppCompatActivity {
             }
             @Override public void onFinish() {
                 remainingSec = 0;
+                RestTimerState.clear();
+                cancelRestAlarm();
+                cancelRestNotification();
+                setKeepScreenOn(false);
                 timerView.setText("Time's up — start your next set!");
                 timerView.setTextColor(getResources().getColor(R.color.danger, getTheme()));
                 pauseBtn.setVisibility(android.view.View.GONE);
@@ -238,6 +301,67 @@ public class ExerciseDetailActivity extends AppCompatActivity {
                 restCountDown = null;
             }
         }.start();
+    }
+
+    // ── Rest notification + background alarm ────────────────────────────────
+
+    private void maybeRequestNotifPermission() {
+        if (Build.VERSION.SDK_INT >= 33 && !Notifications.canPost(this)) {
+            requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 7);
+        }
+    }
+
+    /** Live countdown in the shade — keeps ticking even if the app is left. */
+    private void postRestNotification() {
+        if (!Notifications.canPost(this)) return;
+        Notifications.ensureChannels(this);
+        android.app.PendingIntent open = android.app.PendingIntent.getActivity(this, 1,
+                new Intent(this, ExerciseDetailActivity.class)
+                        .putExtra("exercise_name", exercise.getName())
+                        .putExtra("date", date.toString())
+                        .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
+        androidx.core.app.NotificationCompat.Builder b =
+                new androidx.core.app.NotificationCompat.Builder(this, Notifications.CHANNEL_REST)
+                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                .setContentTitle("Resting — " + exercise.getName())
+                .setContentText("Next set when the timer hits zero")
+                .setUsesChronometer(true)
+                .setChronometerCountDown(true)
+                .setWhen(RestTimerState.endsAt())
+                .setOnlyAlertOnce(true)
+                .setAutoCancel(true)
+                .setContentIntent(open);
+        android.app.NotificationManager nm = getSystemService(android.app.NotificationManager.class);
+        if (nm != null) nm.notify(Notifications.ID_REST, b.build());
+    }
+
+    private void cancelRestNotification() {
+        android.app.NotificationManager nm = getSystemService(android.app.NotificationManager.class);
+        if (nm != null) nm.cancel(Notifications.ID_REST);
+    }
+
+    private android.app.PendingIntent restAlarmIntent() {
+        return android.app.PendingIntent.getBroadcast(this, 101,
+                new Intent(this, RestAlarmReceiver.class).putExtra("exercise", exercise.getName()),
+                android.app.PendingIntent.FLAG_UPDATE_CURRENT | android.app.PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    /** Backgrounded "rest over" alert — inexact is fine for a gym timer. */
+    private void scheduleRestAlarm() {
+        android.app.AlarmManager am = getSystemService(android.app.AlarmManager.class);
+        if (am != null) am.setAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP,
+                RestTimerState.endsAt(), restAlarmIntent());
+    }
+
+    private void cancelRestAlarm() {
+        android.app.AlarmManager am = getSystemService(android.app.AlarmManager.class);
+        if (am != null) am.cancel(restAlarmIntent());
+    }
+
+    private void setKeepScreenOn(boolean on) {
+        if (on) getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        else    getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
 
     private void playBeepAndVibrate() {

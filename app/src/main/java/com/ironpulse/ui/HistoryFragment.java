@@ -10,6 +10,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import com.ironpulse.R;
 import com.ironpulse.data.AppRepository;
+import com.ironpulse.data.Units;
 import com.ironpulse.model.*;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -74,11 +75,19 @@ public class HistoryFragment extends Fragment {
         // 60 days of data so user can scroll back ~2 months
         for (int i = 59; i >= 0; i--) {
             LocalDate d = today.minusDays(i);
-            List<ExerciseData> done = repo.completed.getOrDefault(d, Collections.emptyList());
-            double vol = done.stream().filter(ex -> ex.getName().equals(name))
-                    .mapToDouble(repo::estimateVolume).sum();
+            // Prefer the actual logged sets — the truth of what was lifted that day.
+            double vol = repo.setLogs.stream()
+                    .filter(s -> s.getExerciseName().equals(name) && s.getDate().equals(d))
+                    .mapToDouble(SetLog::volume).sum();
+            // Fall back to the planned-volume estimate for days completed via the
+            // checkbox without logging individual sets.
+            if (vol == 0) {
+                List<ExerciseData> done = repo.completed.getOrDefault(d, Collections.emptyList());
+                vol = done.stream().filter(ex -> ex.getName().equals(name))
+                        .mapToDouble(repo::estimateVolume).sum();
+            }
             labels.add(d.format(fmt));
-            values.add(vol);
+            values.add(Units.toDisplay(vol)); // volume shown in the display unit
         }
         chartView.setData(values, labels);
     }

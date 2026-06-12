@@ -53,6 +53,22 @@ public class MainActivity extends AppCompatActivity {
             int selectedId = savedInstanceState.getInt(KEY_NAV, R.id.nav_workout);
             nav.setSelectedItemId(selectedId);
         }
+
+        // Alarms vanish on force-stop/reboot edge cases — re-arm whenever we open
+        if (repo.reminderEnabled)
+            com.ironpulse.notify.Reminders.schedule(this, repo.reminderHour, repo.reminderMinute);
+
+        // First launch: ask sex once — used by the macro calculator and body
+        // calculations everywhere, changeable later in More → Settings.
+        if (repo.gender == null || repo.gender.isEmpty()) {
+            new androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("Welcome to IronPulse")
+                .setMessage("Are you male or female?\n\nThis is used for macro and body calculations. You can change it any time in More → Settings.")
+                .setPositiveButton("Male",   (d, w) -> { repo.gender = "Male";   repo.saveAsync(); })
+                .setNegativeButton("Female", (d, w) -> { repo.gender = "Female"; repo.saveAsync(); })
+                .setCancelable(false)
+                .show();
+        }
     }
 
     @Override

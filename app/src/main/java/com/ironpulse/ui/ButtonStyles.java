@@ -12,13 +12,13 @@ import com.ironpulse.R;
 final class ButtonStyles {
     private ButtonStyles() {}
 
-    static void edit(Button b)   { apply(b, R.drawable.btn_accent_dark); }   // green
+    static void edit(Button b)   { apply(b, R.drawable.btn_primary); }       // accent green
     static void delete(Button b) { apply(b, R.drawable.btn_danger); }        // red
     static void log(Button b)    { apply(b, R.drawable.btn_primary); }       // accent green
 
-    /** Edit/Done toggle: green when idle, red when active. */
+    /** Edit/Done toggle: green in both states (only the label changes). */
     static void toggle(Button b, boolean active) {
-        if (active) delete(b); else edit(b);
+        edit(b);
     }
 
     private static void apply(Button b, int bgRes) {

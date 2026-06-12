@@ -37,7 +37,7 @@
         android:layout_height="220dp"
         android:layout_marginBottom="10dp"/>
 
-    <!-- Goal-weight progress bar (populated in code, hidden until a goal is set) -->
+    <!-- Goal-weight progress bar (populated in code; shows a setup hint until a goal is set) -->
     <LinearLayout
         android:id="@+id/goal_container"
         android:layout_width="match_parent"
