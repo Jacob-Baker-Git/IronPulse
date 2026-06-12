@@ -20,6 +20,8 @@ public class MoreFragment extends Fragment {
     private static final String[] MACRO_LABELS = {"Calories","Protein (g)","Carbs (g)","Fats (g)"};
     private TextView[] tabs;
     private boolean prEditMode = false;
+    /** Macros tab edit mode: unlocks saved-food editing and manual Daily Targets. */
+    private boolean foodEditMode = false;
     private Button prEditBtn;
     private LinearLayout prListContainer;
     // PR RecyclerView drag support
@@ -45,7 +47,7 @@ public class MoreFragment extends Fragment {
         };
         for (int i = 0; i < tabs.length; i++) {
             final int idx = i;
-            tabs[i].setOnClickListener(x -> { tab = idx; prEditMode = false; updateTabUI(); buildContent(content); });
+            tabs[i].setOnClickListener(x -> { tab = idx; prEditMode = false; foodEditMode = false; updateTabUI(); buildContent(content); });
         }
         updateTabUI();
         buildContent(content);
@@ -382,11 +384,19 @@ public class MoreFragment extends Fragment {
         lh.setText("Logged Today (" + today.size() + ")");
         lh.setTextColor(themeColor(R.attr.colorTextMuted)); lh.setTextSize(11);
         logHdr.addView(lh);
+        // Edit toggle: unlocks saved-food chips and the Daily Targets fields below
+        Button fe = new Button(requireContext());
+        fe.setText(foodEditMode ? "Done" : "Edit"); ButtonStyles.toggle(fe, foodEditMode);
+        LinearLayout.LayoutParams felp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        felp.setMargins(0, 0, 6, 0); fe.setLayoutParams(felp);
+        fe.setOnClickListener(x -> { foodEditMode = !foodEditMode; buildContent(c); });
+        logHdr.addView(fe);
         if (!today.isEmpty()) {
             Button clr = new Button(requireContext());
-            clr.setText("Clear"); ButtonStyles.delete(clr);
+            clr.setText("Clear All"); ButtonStyles.delete(clr);
             clr.setOnClickListener(x -> Dialogs.confirm(requireContext(), "Clear log",
-                    "Are you sure you want to clear everything logged today?", "Clear", () -> {
+                    "Are you sure you want to clear everything logged today?", "Clear All", () -> {
                 repo.foodLog.remove(LocalDate.now()); repo.saveAsync(); buildContent(c);
             }));
             logHdr.addView(clr);
@@ -404,7 +414,9 @@ public class MoreFragment extends Fragment {
         }
 
         // ── Goal targets + calculator ──
-        sp(c, 16); hdr(c, "Daily Targets (Goal)");
+        sp(c, 16);
+        hdr(c, foodEditMode ? "Daily Targets (Goal)"
+                : "Daily Targets (Goal)  ·  tap Edit above to change manually");
         for (int i = 0; i < 4; i++) { final int idx = i; editRow(c, MACRO_LABELS[i], repo.macroGoals[i],
                 v -> { repo.macroGoals[idx] = v; repo.saveDebounced(); }); }
         sp(c, 12);
@@ -412,7 +424,7 @@ public class MoreFragment extends Fragment {
         pb.setOnClickListener(x -> showMacroPreset(c));
     }
 
-    /** A tappable food pill. Tap → log to today; long-press a saved food → delete it. */
+    /** A tappable food pill. Tap → log to today; in edit mode, tap a saved food → edit/delete it. */
     private TextView foodChip(LinearLayout c, Food f, boolean saved) {
         TextView chip = new TextView(requireContext());
         chip.setText((saved ? "★ " : "") + f.getName() + "  ·  " + (int) f.getCals());
@@ -423,18 +435,53 @@ public class MoreFragment extends Fragment {
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         lp.setMargins(0, 0, 8, 0); chip.setLayoutParams(lp);
         chip.setOnClickListener(x -> {
+            if (foodEditMode) {
+                if (saved) showEditFoodDialog(c, f);
+                else Toast.makeText(requireContext(),
+                        "Built-in food — can't be edited", Toast.LENGTH_SHORT).show();
+                return;
+            }
             addFoodToday(new Food(f.getName(), f.getCals(), f.getProtein(), f.getCarbs(), f.getFats()));
             buildContent(c);
             Toast.makeText(requireContext(), "Added " + f.getName(), Toast.LENGTH_SHORT).show();
         });
-        if (saved) chip.setOnLongClickListener(x -> {
-            new AlertDialog.Builder(requireContext()).setTitle("Delete saved food")
-                .setMessage("Remove \"" + f.getName() + "\" from your saved foods?")
-                .setPositiveButton("Delete", (d, w) -> { repo.savedFoods.remove(f); repo.saveAsync(); buildContent(c); })
-                .setNegativeButton("Cancel", null).show();
-            return true;
-        });
         return chip;
+    }
+
+    /** Edit-mode dialog for a saved food: change name/macros, or delete it. */
+    private void showEditFoodDialog(LinearLayout c, Food f) {
+        EditText nf = new EditText(requireContext()); nf.setHint("Food name"); nf.setText(f.getName());
+        EditText cf = new EditText(requireContext()); cf.setHint("Calories"); cf.setText(fmtD(f.getCals()));
+        EditText pf = new EditText(requireContext()); pf.setHint("Protein (g)"); pf.setText(fmtD(f.getProtein()));
+        EditText cbf = new EditText(requireContext()); cbf.setHint("Carbs (g)"); cbf.setText(fmtD(f.getCarbs()));
+        EditText ff = new EditText(requireContext()); ff.setHint("Fats (g)"); ff.setText(fmtD(f.getFats()));
+        for (EditText e : new EditText[]{cf, pf, cbf, ff})
+            e.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        LinearLayout l = new LinearLayout(requireContext());
+        l.setOrientation(LinearLayout.VERTICAL); l.setPadding(48, 16, 48, 0);
+        l.addView(nf); l.addView(cf); l.addView(pf); l.addView(cbf); l.addView(ff);
+        new AlertDialog.Builder(requireContext()).setTitle("Edit: " + f.getName()).setView(l)
+            .setPositiveButton("Save", (d, w) -> {
+                String nm = nf.getText().toString().trim();
+                if (nm.isEmpty()) { Toast.makeText(requireContext(), "Enter a name", Toast.LENGTH_SHORT).show(); return; }
+                f.setName(nm);
+                f.setCals(parseD(cf.getText().toString()));
+                f.setProtein(parseD(pf.getText().toString()));
+                f.setCarbs(parseD(cbf.getText().toString()));
+                f.setFats(parseD(ff.getText().toString()));
+                repo.saveAsync(); buildContent(c);
+            })
+            .setNeutralButton("Delete", (d, w) ->
+                Dialogs.confirmDelete(requireContext(), "\"" + f.getName() + "\" from your saved foods", () -> {
+                    repo.savedFoods.remove(f); repo.saveAsync(); buildContent(c);
+                }))
+            .setNegativeButton("Cancel", null).show();
+    }
+
+    /** Plain (Locale.US) number for prefilling edit fields — never a comma decimal. */
+    private String fmtD(double v) {
+        return v == Math.floor(v) ? String.valueOf((int) v)
+                : String.format(java.util.Locale.US, "%.1f", v);
     }
 
     private LinearLayout loggedFoodRow(LinearLayout c, Food f) {
@@ -529,6 +576,9 @@ public class MoreFragment extends Fragment {
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         fp.setMargins(8, 0, 0, 0);
         field.setLayoutParams(fp);
+        // Manual changes require Edit mode — the preset calculator still works anytime.
+        field.setEnabled(foodEditMode);
+        field.setAlpha(foodEditMode ? 1f : 0.6f);
         field.addTextChangedListener(new android.text.TextWatcher() {
             public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
             public void onTextChanged(CharSequence s, int st, int b, int c) {}
@@ -543,10 +593,12 @@ public class MoreFragment extends Fragment {
         Spinner gs = new Spinner(requireContext()), ss = new Spinner(requireContext());
         EditText bw = new EditText(requireContext()); bw.setHint("Current bodyweight (kg)");
         bw.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        if (repo.startWeightKg > 0) bw.setText(String.format("%.1f", repo.startWeightKg));
+        // Locale.US: a comma decimal separator ("82,5") would be rejected by the
+        // field's digits filter and by the parse on Apply.
+        if (repo.startWeightKg > 0) bw.setText(String.format(java.util.Locale.US, "%.1f", repo.startWeightKg));
         EditText gw = new EditText(requireContext()); gw.setHint("Goal bodyweight (kg)");
         gw.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        if (repo.goalWeightKg > 0) gw.setText(String.format("%.1f", repo.goalWeightKg));
+        if (repo.goalWeightKg > 0) gw.setText(String.format(java.util.Locale.US, "%.1f", repo.goalWeightKg));
         ArrayAdapter<String> ga = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, goals);
         ga.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item); gs.setAdapter(ga);
         ArrayAdapter<String> sa = new ArrayAdapter<>(requireContext(), android.R.layout.simple_spinner_item, sexes);
@@ -559,7 +611,8 @@ public class MoreFragment extends Fragment {
         new AlertDialog.Builder(requireContext()).setTitle("Macro Preset").setView(l)
             .setPositiveButton("Apply", (d, w) -> {
                 try {
-                    double b = Double.parseDouble(bw.getText().toString().trim());
+                    double b = parseD(bw.getText().toString());
+                    if (b <= 0) throw new NumberFormatException();
                     // Capture start (current) and goal weight for the Body goal bar.
                     repo.startWeightKg = b;
                     double goalW = parseD(gw.getText().toString());

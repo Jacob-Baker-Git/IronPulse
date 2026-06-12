@@ -690,7 +690,6 @@ public class WorkoutFragment extends Fragment {
                     load.run();
                 }
             })
-            // Long press on custom templates to delete them
             .show();
     }
 

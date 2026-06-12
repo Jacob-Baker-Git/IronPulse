@@ -206,8 +206,9 @@ public class WeightChartView extends View {
         gridPaint.setStyle(Paint.Style.FILL);
         gridPaint.setColor(0x33888888);
         canvas.drawRoundRect(new RectF(padL, trackY, w - padR, trackY + trackH), trackH / 2, trackH / 2, gridPaint);
-        float bx1 = padL + (visFirst - graphStartF) * sp;
-        float bx2 = padL + (visLast - graphStartF) * sp;
+        float overhang = 20f; // let the bar reach slightly past its end points
+        float bx1 = padL + (visFirst - graphStartF) * sp - overhang;
+        float bx2 = padL + (visLast - graphStartF) * sp + overhang;
         bx1 = Math.max(padL, Math.min(bx1, w - padR));
         bx2 = Math.max(padL, Math.min(bx2, w - padR));
         if (bx2 - bx1 < 24f) bx2 = Math.min(w - padR, bx1 + 24f);

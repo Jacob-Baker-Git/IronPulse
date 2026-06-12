@@ -23,6 +23,10 @@ final class ButtonStyles {
 
     private static void apply(Button b, int bgRes) {
         float d = b.getResources().getDisplayMetrics().density;
+        // XML-inflated buttons are MaterialButtons whose default backgroundTint
+        // (colorPrimary) paints over the custom drawable — clear it so the real
+        // colour (e.g. red for Delete) shows.
+        b.setBackgroundTintList(null);
         b.setBackgroundResource(bgRes);
         int ph = Math.round(18 * d), pv = Math.round(7 * d);
         b.setPadding(ph, pv, ph, pv);

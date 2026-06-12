@@ -98,6 +98,28 @@ public class BodyFragment extends Fragment {
             }
         });
 
+        // Cap the log viewport at 5 rows so the chart's green bar underlines a
+        // 5-entry window inside the 7-point graph instead of spanning all of it.
+        // On screens too short for 5 rows the weight-based height stays as-is.
+        recycler.getViewTreeObserver().addOnGlobalLayoutListener(
+                new android.view.ViewTreeObserver.OnGlobalLayoutListener() {
+            @Override public void onGlobalLayout() {
+                if (recycler.getChildCount() == 0) return;
+                View first = recycler.getChildAt(0);
+                if (first == null || first.getHeight() == 0) return;
+                recycler.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                int target = first.getHeight() * 5;
+                if (recycler.getHeight() > target) {
+                    LinearLayout.LayoutParams lp =
+                            (LinearLayout.LayoutParams) recycler.getLayoutParams();
+                    lp.height = target;
+                    lp.weight = 0;
+                    recycler.setLayoutParams(lp);
+                    recycler.post(BodyFragment.this::updateGraphFromLog);
+                }
+            }
+        });
+
         refresh();
         return v;
     }
@@ -121,8 +143,10 @@ public class BodyFragment extends Fragment {
 
         BodyWeightEntry latest = sortedAsc.get(sortedAsc.size() - 1);
         long ago = java.time.temporal.ChronoUnit.DAYS.between(latest.getDate(), LocalDate.now());
-        lastWeighedText.setText(String.format("Last: %.1f kg — %s",
-                latest.getWeightKg(), ago == 0 ? "today" : ago == 1 ? "yesterday" : ago + " days ago"));
+        // Future-dated entries would read "-7 days ago" — show the date instead
+        String when = ago == 0 ? "today" : ago == 1 ? "yesterday"
+                : ago > 1 ? ago + " days ago" : formatDate(latest.getDate());
+        lastWeighedText.setText(String.format("Last: %.1f kg — %s", latest.getWeightKg(), when));
 
         buildGoalBar();
         if (adapter != null) adapter.notifyDataSetChanged();
@@ -267,7 +291,7 @@ public class BodyFragment extends Fragment {
 
     private class EntryAdapter extends RecyclerView.Adapter<EntryAdapter.VH> {
         class VH extends RecyclerView.ViewHolder {
-            LinearLayout row; TextView date, val; Button edit, del; View divider;
+            LinearLayout row; TextView date, val; View divider;
             VH(LinearLayout container) { super(container);
                 row = (LinearLayout) ((LinearLayout) container).getChildAt(0);
                 date = (TextView) row.getChildAt(0);
@@ -369,7 +393,8 @@ public class BodyFragment extends Fragment {
         EditText wf = new EditText(requireContext());
         wf.setHint("Weight (kg)  e.g. 82.5");
         wf.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        if (isEdit) wf.setText(String.format("%.1f", existing.getWeightKg()));
+        // Locale.US: a comma decimal ("82,5") can be mangled by the digits filter
+        if (isEdit) wf.setText(String.format(java.util.Locale.US, "%.1f", existing.getWeightKg()));
 
         LinearLayout l = new LinearLayout(requireContext());
         l.setOrientation(LinearLayout.VERTICAL); l.setPadding(48, 24, 48, 8);
@@ -387,10 +412,24 @@ public class BodyFragment extends Fragment {
                 try {
                     LocalDate date = LocalDate.parse(df.getText().toString().trim());
                     double kg = Double.parseDouble(wf.getText().toString().trim().replace(",", "."));
-                    if (isEdit) repo.bodyEntries.remove(existing);
-                    repo.bodyEntries.removeIf(e -> e.getDate().equals(date) && e != existing);
-                    repo.bodyEntries.add(new BodyWeightEntry(date, kg));
-                    repo.saveAsync(); refresh();
+                    if (kg <= 0 || kg > 700) throw new NumberFormatException();
+                    Runnable commit = () -> {
+                        if (isEdit) repo.bodyEntries.remove(existing);
+                        repo.bodyEntries.removeIf(e -> e.getDate().equals(date) && e != existing);
+                        repo.bodyEntries.add(new BodyWeightEntry(date, kg));
+                        repo.saveAsync(); refresh();
+                    };
+                    // One entry per day — warn before overwriting an existing one
+                    BodyWeightEntry dup = null;
+                    for (BodyWeightEntry e2 : repo.bodyEntries)
+                        if (e2.getDate().equals(date) && e2 != existing) { dup = e2; break; }
+                    if (dup != null) {
+                        Dialogs.confirm(requireContext(), "Replace entry",
+                                String.format("You already logged %.1f kg on %s. Replace it with %.1f kg?",
+                                        dup.getWeightKg(), formatDate(date), kg), "Replace", commit);
+                    } else {
+                        commit.run();
+                    }
                 } catch (Exception e) {
                     Toast.makeText(requireContext(), "Invalid input", Toast.LENGTH_SHORT).show();
                 }
@@ -406,7 +445,9 @@ public class BodyFragment extends Fragment {
         new AlertDialog.Builder(requireContext()).setTitle("Set Height").setView(f)
             .setPositiveButton("Save", (d, w) -> {
                 try {
-                    repo.heightCm = Double.parseDouble(f.getText().toString().trim());
+                    double cm = Double.parseDouble(f.getText().toString().trim().replace(",", "."));
+                    if (cm <= 0 || cm > 300) throw new NumberFormatException();
+                    repo.heightCm = cm;
                     repo.saveAsync();
                     heightBtn.setText(String.format("%.0f cm", repo.heightCm));
                     refresh();
