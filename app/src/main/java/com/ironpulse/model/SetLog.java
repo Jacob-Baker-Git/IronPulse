@@ -2,7 +2,7 @@ package com.ironpulse.model;
 import java.time.LocalDate;
 public class SetLog {
     private final LocalDate date;
-    private final String exerciseName;
+    private String exerciseName; // mutable so exercise renames carry history along
     private final int setNumber;
     private final double weightKg;
     private final int reps;
@@ -13,6 +13,7 @@ public class SetLog {
     }
     public LocalDate getDate() { return date; }
     public String getExerciseName() { return exerciseName; }
+    public void setExerciseName(String n) { this.exerciseName=n; }
     public int getSetNumber() { return setNumber; }
     public double getWeightKg() { return weightKg; }
     public int getReps() { return reps; }

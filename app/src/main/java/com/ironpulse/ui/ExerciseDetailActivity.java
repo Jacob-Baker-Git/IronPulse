@@ -52,13 +52,15 @@ public class ExerciseDetailActivity extends AppCompatActivity {
             return androidx.core.view.WindowInsetsCompat.CONSUMED;
         });
 
+        String exId = getIntent().getStringExtra("exercise_id");
         String name = getIntent().getStringExtra("exercise_name");
         String ds   = getIntent().getStringExtra("date");
         try { date = ds != null ? LocalDate.parse(ds) : LocalDate.now(); }
         catch (Exception e) { date = LocalDate.now(); }
 
+        // Stable id first (rename/duplicate-proof), name as the legacy fallback
         exercise = repo.exercises.stream()
-                .filter(ex -> ex.getName().equals(name))
+                .filter(ex -> exId != null ? exId.equals(ex.getId()) : ex.getName().equals(name))
                 .findFirst().orElse(null);
         // Deleted exercises still appear on past days via the completion snapshot —
         // fall back to that copy so the user can view their logged sets.
@@ -92,8 +94,7 @@ public class ExerciseDetailActivity extends AppCompatActivity {
             return;
         }
 
-        String[] rp = exercise.getReps() == null ? new String[]{"3"} : exercise.getReps().split("x");
-        targetSets  = rp.length > 0 ? pi(rp[0], 3) : 3;
+        targetSets = exercise.getSets();
 
         // Count sets already logged for this exercise on this date
         loggedSets = (int) repo.setLogs.stream()
@@ -181,10 +182,8 @@ public class ExerciseDetailActivity extends AppCompatActivity {
 
         if (weightField.getText().toString().isEmpty())
             weightField.setText(exercise.isBodyweight() ? "BW" : Units.num(exercise.getWeightKg()));
-        if (repsField.getText().toString().isEmpty()) {
-            String[] rp = exercise.getReps() == null ? new String[]{"3"} : exercise.getReps().split("x");
-            repsField.setText(rp.length > 1 ? rp[1] : "10");
-        }
+        if (repsField.getText().toString().isEmpty())
+            repsField.setText(String.valueOf(exercise.getRepsPerSet()));
 
         List<SetLog> todaySets = repo.setLogs.stream()
                 .filter(s -> s.getExerciseName().equals(exercise.getName())
@@ -317,6 +316,7 @@ public class ExerciseDetailActivity extends AppCompatActivity {
         Notifications.ensureChannels(this);
         android.app.PendingIntent open = android.app.PendingIntent.getActivity(this, 1,
                 new Intent(this, ExerciseDetailActivity.class)
+                        .putExtra("exercise_id", exercise.getId())
                         .putExtra("exercise_name", exercise.getName())
                         .putExtra("date", date.toString())
                         .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),

@@ -103,80 +103,37 @@ public class AppRepository {
         saveAsync();
     }
 
-    /**
-     * Streak rule: ONLY today affects the streak number.
-     * - If today has no exercises or is a rest day → 0
-     * - If today is not fully complete → 0
-     * - If today IS complete → 1, then walk back through consecutive days:
-     *   - Rest days: skip silently (don't break chain)
-     *   - Days with no exercises scheduled: skip silently (don't break chain)
-     *     BUT only skip if the exercise was not yet added (addedDate after that day)
-     *     i.e. a day truly had no exercises in the plan at the time
-     *   - Days with exercises that are NOT all complete: break chain
-     * To prevent an exercise added today from inflating streak by skipping all prior
-     * empty days, we limit silent skips to MAX 6 consecutive empty/rest days in a row.
-     */
-    /**
-     * Counts the streak that WOULD exist if today is completed.
-     * Walks back from yesterday exactly like computeStreak walks back from today.
-     * Used to show "X day streak — complete today to extend!"
-     */
-    public int computePotentialStreak() {
-        LocalDate today = LocalDate.now();
-        LocalDate yesterday = today.minusDays(1);
-        // Check if yesterday was a rest day or had no exercises — if so no potential streak
-        if (isRestWeekday(yesterday)) return 0;
-        List<ExerciseData> yPlanned = getExercisesForDate(yesterday);
-        if (yPlanned.isEmpty()) return 0;
-        if (!isDateComplete(yesterday)) return 0;
-        // Yesterday was complete — count back
-        int streak = 1;
-        int consecutiveSkips = 0;
-        for (int i = 2; i <= 730; i++) {
-            LocalDate d = today.minusDays(i);
-            if (isRestWeekday(d)) { consecutiveSkips++; if (consecutiveSkips > 6) break; continue; }
-            List<ExerciseData> planned = getExercisesForDate(d);
-            if (planned.isEmpty()) { consecutiveSkips++; if (consecutiveSkips > 6) break; continue; }
-            consecutiveSkips = 0;
-            if (isDateComplete(d)) streak++;
-            else break;
-        }
-        return streak;
-    }
+    /** Adapter feeding live plan data into the pure, unit-tested streak rules. */
+    private final StreakCalculator.Schedule schedule = new StreakCalculator.Schedule() {
+        @Override public boolean hasPlanned(LocalDate d) { return !getExercisesForDate(d).isEmpty(); }
+        @Override public boolean isComplete(LocalDate d) { return isDateComplete(d); }
+        @Override public boolean isRestWeekday(LocalDate d) { return AppRepository.this.isRestWeekday(d); }
+    };
 
     public int computeStreak() {
-        LocalDate today = LocalDate.now();
-        List<ExerciseData> todayPlanned = getExercisesForDate(today);
-        if (todayPlanned.isEmpty() || isRestDay(today)) return 0;
-        if (!isDateComplete(today)) return 0;
+        return StreakCalculator.computeStreak(LocalDate.now(), schedule);
+    }
 
-        int streak = 1;
-        int consecutiveSkips = 0;
-        for (int i = 1; i <= 730; i++) {
-            LocalDate d = today.minusDays(i);
-            if (isRestWeekday(d)) { consecutiveSkips++; if (consecutiveSkips > 6) break; continue; }
-            List<ExerciseData> planned = getExercisesForDate(d);
-            if (planned.isEmpty()) { consecutiveSkips++; if (consecutiveSkips > 6) break; continue; }
-            // This day had exercises planned
-            consecutiveSkips = 0;
-            if (isDateComplete(d)) streak++;
-            else break;
-        }
-        return streak;
+    /** Streak that WOULD exist if today is completed — see {@link StreakCalculator}. */
+    public int computePotentialStreak() {
+        return StreakCalculator.computePotentialStreak(LocalDate.now(), schedule);
     }
 
     public double estimateVolume(ExerciseData ex) {
-        String[] parts = ex.getReps()==null?new String[0]:ex.getReps().toLowerCase().split("x");
-        double sets=Math.max(1,parts.length>1?parseNum(parts[0]):1);
-        double reps=Math.max(1,parts.length>1?parseNum(parts[1]):parseNum(ex.getReps()));
+        double sets = ex.getSets(), reps = ex.getRepsPerSet();
         if (ex.isBodyweight()) return sets*reps;
         double w=ex.getWeightKg();
         return w>0?w*sets*reps:sets*reps;
     }
 
-    private double parseNum(String s) {
-        if (s==null) return 0;
-        try { return Double.parseDouble(s.trim().replaceAll("[^0-9.]","")); } catch(Exception e) { return 0; }
+    /** Renames an exercise and carries its logged-set history along with it. */
+    public void renameExercise(ExerciseData ex, String newName) {
+        String old = ex.getName();
+        if (newName == null || newName.trim().isEmpty() || newName.equals(old)) return;
+        ex.setName(newName.trim());
+        for (SetLog s : setLogs)
+            if (s.getExerciseName().equals(old)) s.setExerciseName(newName.trim());
+        saveAsync();
     }
 
     public String classifyExercise(String name) {
@@ -217,10 +174,11 @@ public class AppRepository {
         for (Map.Entry<LocalDate,List<ExerciseData>> e : completed.entrySet()) {
             List<String> names = new ArrayList<>();
             // Full data so deleted-exercise history can be reconstructed after restart:
-            // name|addedDate|weight|reps|restSeconds
+            // name|addedDate|weight|reps|restSeconds|id
             for (ExerciseData ex : e.getValue())
                 names.add(ex.getName()+"|"+ex.getAddedDate()+"|"
-                        +(ex.isBodyweight()?"BW":ex.getWeight())+"|"+ex.getReps()+"|"+ex.getRestSeconds());
+                        +(ex.isBodyweight()?"BW":ex.getWeight())+"|"+ex.getReps()+"|"+ex.getRestSeconds()
+                        +"|"+ex.getId());
             compSnap.put(e.getKey().toString(), names);
         }
         final List<Food> foodsSnap = new ArrayList<>(savedFoods);
@@ -258,6 +216,8 @@ public class AppRepository {
     private void load() {
         List<ExerciseData> ex=loadJson("exercises.json",new TypeToken<List<ExerciseData>>(){}.getType());
         if (ex!=null) exercises.addAll(ex);
+        // Migrate pre-id / string-reps records in place
+        for (ExerciseData e : exercises) e.normalize();
         List<BodyWeightEntry> bw=loadJson("body.json",new TypeToken<List<BodyWeightEntry>>(){}.getType());
         if (bw!=null) bodyEntries.addAll(bw);
         List<RecordData> rec=loadJson("records.json",new TypeToken<List<RecordData>>(){}.getType());
@@ -280,13 +240,15 @@ public class AppRepository {
                     for (String pair:e.getValue()) {
                         String[] parts=pair.split("\\|"); if (parts.length<2) continue;
                         String nm=parts[0]; LocalDate ad=LocalDate.parse(parts[1]);
-                        // Consume the match so duplicate names each map to a distinct instance
+                        String id=parts.length>=6?parts[5]:null;
+                        // Consume the match so duplicate names each map to a distinct instance.
+                        // Stable id wins (rename-proof); name+addedDate covers old snapshots.
                         boolean matched=false;
                         for (Iterator<ExerciseData> it=dayEx.iterator(); it.hasNext();) {
                             ExerciseData x=it.next();
-                            if (x.getName().equals(nm)&&x.getAddedDate().equals(ad)) {
-                                doneList.add(x); it.remove(); matched=true; break;
-                            }
+                            boolean hit = id!=null ? id.equals(x.getId())
+                                    : x.getName().equals(nm)&&x.getAddedDate().equals(ad);
+                            if (hit) { doneList.add(x); it.remove(); matched=true; break; }
                         }
                         // No live match — exercise was deleted. Reconstruct a placeholder
                         // from the extended format (name|addedDate|weight|reps|rest) so

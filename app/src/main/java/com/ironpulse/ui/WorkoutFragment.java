@@ -519,6 +519,7 @@ public class WorkoutFragment extends Fragment {
                 h.editButtons.setVisibility(View.GONE);
                 h.itemView.setOnClickListener(v -> {
                     Intent i = new Intent(getContext(), ExerciseDetailActivity.class);
+                    i.putExtra("exercise_id", ex.getId());
                     i.putExtra("exercise_name", ex.getName());
                     i.putExtra("date", selectedDate.toString());
                     startActivity(i);
@@ -587,7 +588,6 @@ public class WorkoutFragment extends Fragment {
     }
 
     private void showEditDialog(ExerciseData ex) {
-        String[] rp = ex.getReps() == null ? new String[]{"3","10"} : ex.getReps().split("x");
         View dlg = LayoutInflater.from(getContext())
                 .inflate(R.layout.dialog_add_exercise, null);
         EditText nameF = dlg.findViewById(R.id.field_name),
@@ -596,10 +596,10 @@ public class WorkoutFragment extends Fragment {
                  rF    = dlg.findViewById(R.id.field_reps),
                  restF = dlg.findViewById(R.id.field_rest);
         wF.setHint("Weight (" + Units.unit() + " or BW)");
-        nameF.setText(ex.getName()); nameF.setEnabled(false);
+        nameF.setText(ex.getName()); // renaming carries set-log history along
         wF.setText(ex.isBodyweight() ? "" : Units.num(ex.getWeightKg()));
-        sF.setText(rp.length > 0 ? rp[0] : "3");
-        rF.setText(rp.length > 1 ? rp[1] : "10");
+        sF.setText(String.valueOf(ex.getSets()));
+        rF.setText(String.valueOf(ex.getRepsPerSet()));
         restF.setText(String.valueOf(ex.getRestSeconds()));
 
         new AlertDialog.Builder(requireContext()).setTitle("Edit: " + ex.getName()).setView(dlg)
@@ -607,6 +607,7 @@ public class WorkoutFragment extends Fragment {
                 ex.setWeight(Units.inputToKgString(wF.getText().toString()));
                 ex.setReps(pi(sF.getText().toString(), 3) + "x" + pi(rF.getText().toString(), 10));
                 ex.setRestSeconds(pi(restF.getText().toString(), 90));
+                repo.renameExercise(ex, nameF.getText().toString()); // saves internally
                 repo.saveAsync(); refreshExercises();
             }).setNegativeButton("Cancel", null).show();
     }
