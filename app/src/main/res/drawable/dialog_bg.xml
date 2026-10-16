@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dialog surface: the card colour with rounded corners, inset from the screen edges -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:insetLeft="20dp"
+    android:insetRight="20dp"
+    android:insetTop="24dp"
+    android:insetBottom="24dp">
+    <shape android:shape="rectangle">
+        <solid android:color="?attr/colorCardBg"/>
+        <corners android:radius="22dp"/>
+    </shape>
+</inset>

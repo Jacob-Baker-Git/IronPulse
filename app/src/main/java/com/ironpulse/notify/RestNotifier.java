@@ -49,7 +49,8 @@ public final class RestNotifier {
         if (!Notifications.canPost(ctx)) return;
         Notifications.ensureChannels(ctx);
         NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, Notifications.CHANNEL_REST)
-                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                .setSmallIcon(com.ironpulse.R.drawable.ic_notification)
+                .setColor(0xFF3EE08F)
                 .setContentTitle("Resting — " + ex.getString(EX_NAME))
                 .setContentText("Next set when the timer hits zero")
                 .setUsesChronometer(true)
@@ -67,7 +68,8 @@ public final class RestNotifier {
         if (!Notifications.canPost(ctx)) return;
         Notifications.ensureChannels(ctx);
         NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, Notifications.CHANNEL_REMINDER)
-                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                .setSmallIcon(com.ironpulse.R.drawable.ic_notification)
+                .setColor(0xFF3EE08F)
                 .setContentTitle("Rest over — next set!")
                 .setContentText(ex.getString(EX_NAME, "Back to it 💪"))
                 .setAutoCancel(true)
@@ -81,7 +83,8 @@ public final class RestNotifier {
         if (!Notifications.canPost(ctx)) return;
         Notifications.ensureChannels(ctx);
         NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, Notifications.CHANNEL_REMINDER)
-                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                .setSmallIcon(com.ironpulse.R.drawable.ic_notification)
+                .setColor(0xFF3EE08F)
                 .setContentTitle("✓ " + ex.getString(EX_NAME) + " complete")
                 .setContentText(prNote != null ? prNote : "All sets logged — nice work!")
                 .setAutoCancel(true)

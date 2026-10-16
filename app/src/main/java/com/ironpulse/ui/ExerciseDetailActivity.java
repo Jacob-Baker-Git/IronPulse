@@ -188,9 +188,9 @@ public class ExerciseDetailActivity extends AppCompatActivity {
         titleView.setText(exercise.getName());
         String w = exercise.isBodyweight() ? "Bodyweight" : Units.fmt(exercise.getWeightKg());
 
-        statsView.setText(w + "  ·  " + exercise.getReps()
-                + "  ·  " + exercise.getRestSeconds() + "s"
-                + "  ·  " + loggedSets + "/" + targetSets + " sets");
+        statsView.setText(w + "  ·  " + exercise.getSets() + "×" + exercise.getRepsPerSet()
+                + "  ·  " + WorkoutFragment.restLabel(exercise.getRestSeconds()) + " rest"
+                + "  ·  " + loggedSets + " of " + targetSets + " sets done");
 
         // Progressive overload: compare against the most recent earlier session,
         // however long ago it was — skipping a week must not lose the reference.
@@ -209,9 +209,10 @@ public class ExerciseDetailActivity extends AppCompatActivity {
                     .orElse(prev.get(0));
             long daysAgo = java.time.temporal.ChronoUnit.DAYS.between(prevDate, date);
             String when = daysAgo == 1 ? "yesterday" : daysAgo + " days ago";
-            prevBestView.setText("↑ Last session (" + when + "): " + best.formatDisplay());
+            prevBestView.setText("Last time (" + when + "): best set "
+                    + (best.isBodyweight() ? "bodyweight" : Units.fmt(best.getWeightKg())) + " × " + best.getReps());
         } else {
-            prevBestView.setText("• First session — log your sets to start tracking");
+            prevBestView.setText("First session — log your sets to start tracking progress");
         }
 
         if (weightField.getText().toString().isEmpty())

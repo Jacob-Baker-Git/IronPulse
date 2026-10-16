@@ -215,7 +215,7 @@ public class WorkoutFragment extends Fragment {
         } else if (isPast) {
             sub = doneCount + " exercise" + (doneCount == 1 ? "" : "s") + " logged";
         } else {
-            sub = doneCount + " of " + planned + " done";
+            sub = doneCount == planned ? "All done — nice work" : doneCount + " of " + planned + " done";
             if (selectedDate.equals(today)) sub += "  ·  " + streakLine();
         }
         heroSub.setText(sub);
@@ -232,10 +232,11 @@ public class WorkoutFragment extends Fragment {
     }
 
     /** "Leg day", "Push day"… when one muscle group is most of the plan, else "Full body". */
-    private String dayTitle(List<ExerciseData> shown, boolean isPast, boolean isRest) {
+    /** Public: the home-screen widget shows the same title. */
+    public static String dayTitle(List<ExerciseData> shown, boolean isPast, boolean isRest) {
         if (shown.isEmpty()) return isRest ? "Rest day" : isPast ? "No workout" : "Free day";
         Map<String, Integer> count = new HashMap<>();
-        for (ExerciseData ex : shown) count.merge(repo.classifyExercise(ex.getName()), 1, Integer::sum);
+        for (ExerciseData ex : shown) count.merge(AppRepository.classifyExercise(ex.getName()), 1, Integer::sum);
         String top = null; int best = 0;
         for (Map.Entry<String, Integer> e : count.entrySet())
             if (e.getValue() > best) { best = e.getValue(); top = e.getKey(); }
@@ -320,7 +321,8 @@ public class WorkoutFragment extends Fragment {
 
     private int dp(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
 
-    private static String restLabel(int s) {
+    /** "45 s", "90 s", "3 min", "2 min 30 s" — shared with the exercise screen. */
+    static String restLabel(int s) {
         if (s < 120) return s + " s";
         return s % 60 == 0 ? (s / 60) + " min" : (s / 60) + " min " + (s % 60) + " s";
     }
@@ -351,7 +353,7 @@ public class WorkoutFragment extends Fragment {
                     + "  ·  " + restLabel(ex.getRestSeconds()) + " rest");
 
             int stripColor;
-            switch (repo.classifyExercise(ex.getName())) {
+            switch (AppRepository.classifyExercise(ex.getName())) {
                 case "Push": stripColor = getColor(R.color.pill_push); break;
                 case "Pull": stripColor = getColor(R.color.pill_pull); break;
                 case "Legs": stripColor = getColor(R.color.pill_legs); break;

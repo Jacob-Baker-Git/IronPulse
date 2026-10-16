@@ -1,32 +1,188 @@
 package com.ironpulse.ui;
 
+import android.content.res.ColorStateList;
+import android.graphics.Typeface;
+import android.view.Gravity;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import com.ironpulse.R;
 import com.ironpulse.model.ExerciseData;
 import java.util.*;
 
-/** "Assessment" tab of the More screen: scores the weekly split and gives advice. */
+/** Programme check: scores the weekly split and explains the score. */
 class AssessmentTab {
     private final MoreFragment host;
 
     AssessmentTab(MoreFragment host) { this.host = host; }
 
-    void build(LinearLayout c) {
-        // Runs on open — it's cheap, and a button in front of it was one more step for nothing
-        host.hdr(c, "YOUR WEEKLY SPLIT, SCORED");
-        TextView result = new TextView(host.requireContext());
-        result.setTextColor(host.themeColor(R.attr.colorTextPrimary)); result.setTextSize(13);
-        result.setTypeface(android.graphics.Typeface.MONOSPACE);
-        result.setLineSpacing(0, 1.15f);
-        result.setBackgroundResource(R.drawable.tile_bg);
-        result.setPadding(host.dp(16), host.dp(16), host.dp(16), host.dp(16));
-        result.setText(runAssessment());
-        c.addView(result);
+    /** A coach note: BAD (red ✗), WARN (amber !) or GOOD (mint ✓). Bad ones are listed first. */
+    private static final int BAD = 0, WARN = 1, GOOD = 2;
+    private static final class Note {
+        final int level; final String text;
+        Note(int level, String text) { this.level = level; this.text = text; }
     }
 
-    private String runAssessment() {
-        if (host.repo.exercises.isEmpty()) return "No exercises found. Add exercises first.";
+    private static final class Result {
+        int score, trainingDays, totalSets, setsPerSession, avgRest;
+        String grade, split;
+        final Map<String, Integer> groups = new LinkedHashMap<>();
+        final List<Note> notes = new ArrayList<>();
+        final List<String> advice = new ArrayList<>();
+    }
+
+    void build(LinearLayout c) {
+        // Runs on open — it's cheap, and a button in front of it was one more step for nothing
+        if (host.repo.exercises.isEmpty()) {
+            TextView t = text("Add exercises on Today and your weekly programme gets scored here.", 15, R.attr.colorTextMuted);
+            c.addView(t);
+            return;
+        }
+        Result r = assess();
+
+        // ── Score card ──
+        LinearLayout hero = new LinearLayout(host.requireContext());
+        hero.setOrientation(LinearLayout.VERTICAL);
+        hero.setBackgroundResource(R.drawable.hero_bg);
+        hero.setPadding(host.dp(18), host.dp(16), host.dp(18), host.dp(16));
+        LinearLayout top = new LinearLayout(host.requireContext());
+        top.setGravity(Gravity.BOTTOM);
+        TextView score = new TextView(host.requireContext());
+        score.setText(String.valueOf(r.score));
+        score.setTextSize(44); score.setTypeface(null, Typeface.BOLD);
+        score.setTextColor(host.color(R.color.on_accent));
+        score.setIncludeFontPadding(false);
+        TextView outOf = new TextView(host.requireContext());
+        outOf.setText(" / 100");
+        outOf.setTextSize(16); outOf.setTypeface(null, Typeface.BOLD);
+        outOf.setTextColor(host.color(R.color.on_accent)); outOf.setAlpha(0.7f);
+        outOf.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        TextView grade = new TextView(host.requireContext());
+        grade.setText(r.grade);
+        grade.setTextSize(22); grade.setTypeface(null, Typeface.BOLD);
+        grade.setTextColor(host.color(R.color.on_accent));
+        top.addView(score); top.addView(outOf); top.addView(grade);
+        hero.addView(top);
+        TextView sub = new TextView(host.requireContext());
+        sub.setText(r.split + "  ·  " + r.trainingDays + (r.trainingDays == 1 ? " day" : " days") + " a week");
+        sub.setTextSize(13); sub.setTypeface(null, Typeface.BOLD);
+        sub.setTextColor(host.color(R.color.on_accent)); sub.setAlpha(0.8f);
+        sub.setPadding(0, host.dp(4), 0, 0);
+        hero.addView(sub);
+        ProgressBar bar = new ProgressBar(host.requireContext(), null, android.R.attr.progressBarStyleHorizontal);
+        bar.setProgressDrawable(androidx.appcompat.content.res.AppCompatResources.getDrawable(host.requireContext(), R.drawable.hero_progress));
+        bar.setMax(100); bar.setProgress(r.score);
+        LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, host.dp(6));
+        bp.topMargin = host.dp(12);
+        hero.addView(bar, bp);
+        c.addView(hero);
+        host.sp(c, 12);
+
+        // ── Four numbers ──
+        String[][] stats = {
+            {r.trainingDays + "/7", "training days"},
+            {String.valueOf(r.totalSets), "sets a week"},
+            {String.valueOf(r.setsPerSession), "sets a session"},
+            {r.avgRest + " s", "average rest"}};
+        for (int row = 0; row < 2; row++) {
+            LinearLayout line = new LinearLayout(host.requireContext());
+            for (int col = 0; col < 2; col++) {
+                String[] s = stats[row * 2 + col];
+                LinearLayout tile = new LinearLayout(host.requireContext());
+                tile.setOrientation(LinearLayout.VERTICAL);
+                tile.setBackgroundResource(R.drawable.tile_bg);
+                tile.setPadding(host.dp(16), host.dp(12), host.dp(12), host.dp(12));
+                TextView v = text(s[0], 20, R.attr.colorTextPrimary);
+                v.setTypeface(null, Typeface.BOLD);
+                tile.addView(v);
+                tile.addView(text(s[1], 12, R.attr.colorTextMuted));
+                LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                if (col == 0) tp.rightMargin = host.dp(4); else tp.leftMargin = host.dp(4);
+                line.addView(tile, tp);
+            }
+            c.addView(line);
+            host.sp(c, 8);
+        }
+
+        // ── Muscle groups ──
+        host.sp(c, 12);
+        host.hdr(c, "SETS PER MUSCLE GROUP");
+        LinearLayout groups = new LinearLayout(host.requireContext());
+        groups.setOrientation(LinearLayout.VERTICAL);
+        groups.setBackgroundResource(R.drawable.tile_bg);
+        groups.setPadding(host.dp(16), host.dp(8), host.dp(16), host.dp(14));
+        int max = 1;
+        for (int v : r.groups.values()) max = Math.max(max, v);
+        for (Map.Entry<String, Integer> g : r.groups.entrySet()) {
+            LinearLayout line = new LinearLayout(host.requireContext());
+            line.setGravity(Gravity.CENTER_VERTICAL);
+            line.setPadding(0, host.dp(6), 0, 0);
+            TextView name = text(g.getKey(), 14, R.attr.colorTextPrimary);
+            name.setLayoutParams(new LinearLayout.LayoutParams(host.dp(52), LinearLayout.LayoutParams.WRAP_CONTENT));
+            ProgressBar pb = new ProgressBar(host.requireContext(), null, android.R.attr.progressBarStyleHorizontal);
+            pb.setMax(max); pb.setProgress(g.getValue());
+            pb.setProgressTintList(ColorStateList.valueOf(groupColor(g.getKey())));
+            pb.setProgressBackgroundTintList(ColorStateList.valueOf(host.themeColor(R.attr.colorBorder)));
+            TextView n = text(g.getValue() + "", 14, R.attr.colorTextMuted);
+            n.setGravity(Gravity.END);
+            n.setLayoutParams(new LinearLayout.LayoutParams(host.dp(36), LinearLayout.LayoutParams.WRAP_CONTENT));
+            line.addView(name);
+            line.addView(pb, new LinearLayout.LayoutParams(0, host.dp(8), 1f));
+            line.addView(n);
+            groups.addView(line);
+        }
+        c.addView(groups);
+
+        // ── Coach notes, problems first ──
+        host.sp(c, 20);
+        host.hdr(c, "COACH NOTES");
+        r.notes.sort(Comparator.comparingInt(n -> n.level));
+        for (Note note : r.notes) {
+            LinearLayout line = new LinearLayout(host.requireContext());
+            line.setPadding(0, host.dp(5), 0, host.dp(5));
+            TextView mark = new TextView(host.requireContext());
+            mark.setText(note.level == GOOD ? "✓" : note.level == WARN ? "!" : "✗");
+            mark.setTypeface(null, Typeface.BOLD);
+            mark.setTextSize(15);
+            mark.setTextColor(host.color(note.level == GOOD ? R.color.accent
+                    : note.level == WARN ? R.color.accent_2 : R.color.danger));
+            mark.setLayoutParams(new LinearLayout.LayoutParams(host.dp(24), LinearLayout.LayoutParams.WRAP_CONTENT));
+            TextView t = text(note.text, 15, note.level == GOOD ? R.attr.colorTextMuted : R.attr.colorTextPrimary);
+            t.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+            line.addView(mark); line.addView(t);
+            c.addView(line);
+        }
+
+        // ── Split advice ──
+        host.sp(c, 20);
+        host.hdr(c, "ABOUT YOUR SPLIT");
+        TextView adv = text(String.join("\n", r.advice), 15, R.attr.colorTextPrimary);
+        adv.setLineSpacing(0, 1.2f);
+        adv.setBackgroundResource(R.drawable.tile_bg);
+        adv.setPadding(host.dp(16), host.dp(14), host.dp(16), host.dp(14));
+        c.addView(adv);
+    }
+
+    private TextView text(String s, int sp, int colorAttr) {
+        TextView t = new TextView(host.requireContext());
+        t.setText(s); t.setTextSize(sp);
+        t.setTextColor(host.themeColor(colorAttr));
+        return t;
+    }
+
+    private int groupColor(String g) {
+        switch (g) {
+            case "Push": return host.color(R.color.pill_push);
+            case "Pull": return host.color(R.color.pill_pull);
+            case "Legs": return host.color(R.color.pill_legs);
+            case "Arms": return host.color(R.color.pill_arms);
+            case "Core": return host.color(R.color.pill_core);
+            default:     return host.color(R.color.pill_other);
+        }
+    }
+
+    private Result assess() {
+        Result r = new Result();
         Map<String,Integer> setCounts = new HashMap<>();
         Map<java.time.DayOfWeek,List<ExerciseData>> byDay = new LinkedHashMap<>();
         for (java.time.DayOfWeek d : java.time.DayOfWeek.values()) byDay.put(d, new ArrayList<>());
@@ -67,48 +223,40 @@ class AssessmentTab {
         if (shortRest==0&&longRest==0) score+=10; else if (shortRest==0||longRest==0) score+=6;
         if (core>0) score+=5; if (arms>0) score+=3;
         if (trainingDays>=4) score+=4; if (totalSets>=15&&totalSets<=25) score+=3;
-        score=Math.min(100,score);
-        String grade=score>=90?"A+":score>=80?"A":score>=70?"B+":score>=60?"B":score>=50?"C+":score>=40?"C":"D";
-        String splitType=detectSplit(byDay,trainingDays);
-        StringBuilder r=new StringBuilder();
-        r.append("━━━━━━━━━━━━━━━━━━━━━━━\n");
-        r.append(String.format(java.util.Locale.US, "  SCORE  %d%%  (%s)\n",score,grade));
-        r.append("━━━━━━━━━━━━━━━━━━━━━━━\n\n");
-        r.append(String.format(java.util.Locale.US, "Split type:      %s\n",splitType));
-        r.append(String.format(java.util.Locale.US, "Training days:   %d/7\n",trainingDays));
-        r.append(String.format(java.util.Locale.US, "Total sets/wk:   %d\n",totalSets));
-        r.append(String.format(java.util.Locale.US, "Sets/session:    %d\n",setsPerSession));
-        r.append(String.format(java.util.Locale.US, "Avg rest:        %.0fs\n\n",avgRest));
-        r.append("MUSCLE GROUPS\n─────────────────────\n");
-        int maxS=Math.max(1,Math.max(push,Math.max(pull,legs)));
-        for (String[] g:new String[][]{{"Push",String.valueOf(push)},{"Pull",String.valueOf(pull)},
-                {"Legs",String.valueOf(legs)},{"Arms",String.valueOf(arms)},{"Core",String.valueOf(core)}}) {
-            int s=Integer.parseInt(g[1]); if (s==0) continue;
-            int bars=Math.max(1,(int)((double)s/maxS*10));
-            r.append(String.format(java.util.Locale.US, "%-5s  %-11s  %2d sets\n",g[0],"█".repeat(bars)+"░".repeat(10-bars),s));
+
+        r.score=Math.min(100,score);
+        r.grade=r.score>=90?"A+":r.score>=80?"A":r.score>=70?"B+":r.score>=60?"B":r.score>=50?"C+":r.score>=40?"C":"D";
+        r.split=detectSplit(byDay,trainingDays);
+        r.trainingDays=trainingDays; r.totalSets=totalSets; r.setsPerSession=setsPerSession;
+        r.avgRest=(int)Math.round(avgRest);
+        for (String g : new String[]{"Push","Pull","Legs","Arms","Core"}) {
+            int s = setCounts.getOrDefault(g, 0);
+            if (s > 0) r.groups.put(g, s);
         }
+
+        List<Note> n = r.notes;
+        n.add(push==0 ? new Note(BAD, "No push work — add bench, press or dips") : new Note(GOOD, "Push work present"));
+        n.add(pull==0 ? new Note(BAD, "No pull work — add rows or pulldowns") : new Note(GOOD, "Pull work present"));
+        n.add(legs==0 ? new Note(BAD, "No leg work — don't skip leg day") : new Note(GOOD, "Leg work present"));
+        if (core==0) n.add(new Note(WARN, "No core work — add planks or abs"));
         if (push>0&&pull>0) {
             double ratio=(double)Math.min(push,pull)/Math.max(push,pull);
-            r.append(String.format(java.util.Locale.US, "\nPush:Pull  %d:%d  %s\n",push,pull,
-                ratio>=0.8?"✓ Balanced":push>pull?"⚠ Push-heavy":"⚠ Pull-heavy"));
+            if (ratio>=0.8) n.add(new Note(GOOD, "Push and pull are balanced (" + push + ":" + pull + ")"));
+            else n.add(new Note(WARN, (push>pull ? "Push" : "Pull") + "-heavy (" + push + " vs " + pull
+                    + " sets) — even them out to avoid imbalance"));
         }
-        r.append("\nCOACH NOTES\n─────────────────────\n");
-        if (push==0) r.append("✗ No push work — add bench/press/dip\n"); else r.append("✓ Push work present\n");
-        if (pull==0) r.append("✗ No pull work — add rows/pulldowns\n"); else r.append("✓ Pull work present\n");
-        if (legs==0) r.append("✗ No leg work — don't skip leg day!\n"); else r.append("✓ Leg work present\n");
-        if (core==0) r.append("⚠ No core work — add planks/abs\n");
-        if (push>0&&pull>0&&Math.abs(push-pull)>4) r.append("⚠ Push/pull gap ("+push+" vs "+pull+" sets) — risk of imbalance\n");
-        if (trainingDays<3) r.append("⚠ Low frequency ("+trainingDays+" days) — aim for 3–5\n");
-        else if (trainingDays<=5) r.append("✓ Good training frequency ("+trainingDays+" days/wk)\n");
-        else r.append("⚠ Very high frequency ("+trainingDays+" days) — watch recovery\n");
-        if (setsPerSession<8) r.append("⚠ Low volume ("+setsPerSession+" sets/session) — aim 10–20\n");
-        else if (setsPerSession<=20) r.append("✓ Good session volume ("+setsPerSession+" sets)\n");
-        else r.append("⚠ High volume ("+setsPerSession+" sets/session) — monitor recovery\n");
-        if (shortRest>0) r.append("⚠ "+shortRest+" exercise(s) with very short rest (<45s)\n");
-        if (longRest>0) r.append("  "+longRest+" exercise(s) with long rest (>3min) — fine for compounds\n");
-        if (avgRest>=60&&avgRest<=180) r.append("✓ Rest time appropriate ("+((int)avgRest)+"s avg)\n");
-        r.append("\n").append(getSplitAdvice(splitType,trainingDays,setsPerSession));
-        return r.toString();
+        if (trainingDays<3) n.add(new Note(WARN, "Low frequency (" + trainingDays + " days) — aim for 3–5"));
+        else if (trainingDays<=5) n.add(new Note(GOOD, "Good training frequency (" + trainingDays + " days a week)"));
+        else n.add(new Note(WARN, "Very high frequency (" + trainingDays + " days) — watch recovery"));
+        if (setsPerSession<8) n.add(new Note(WARN, "Low volume (" + setsPerSession + " sets a session) — aim for 10–20"));
+        else if (setsPerSession<=20) n.add(new Note(GOOD, "Good session volume (" + setsPerSession + " sets)"));
+        else n.add(new Note(WARN, "High volume (" + setsPerSession + " sets a session) — monitor recovery"));
+        if (shortRest>0) n.add(new Note(WARN, shortRest + " exercise" + (shortRest==1?"":"s") + " with very short rest (under 45 s)"));
+        if (longRest>0) n.add(new Note(GOOD, longRest + " exercise" + (longRest==1?"":"s") + " with long rest (over 3 min) — fine for big lifts"));
+        if (avgRest>=60&&avgRest<=180) n.add(new Note(GOOD, "Rest times are sensible (" + r.avgRest + " s average)"));
+
+        r.advice.addAll(splitAdvice(r.split, trainingDays, setsPerSession));
+        return r;
     }
 
     private String detectSplit(Map<java.time.DayOfWeek,List<ExerciseData>> byDay, int trainingDays) {
@@ -138,31 +286,31 @@ class AssessmentTab {
         return trainingDays<=3?"Bro Split / Custom":"Custom";
     }
 
-    private String getSplitAdvice(String split,int days,int sps) {
-        StringBuilder a=new StringBuilder("SPLIT ADVICE\n─────────────────────\n");
+    private List<String> splitAdvice(String split, int days, int sps) {
+        List<String> a = new ArrayList<>();
         switch (split) {
             case "Push/Pull/Legs":
-                a.append("PPL is excellent for intermediate+.\n");
-                if (days==6) a.append("✓ 6-day PPL: optimal frequency for hypertrophy.\n");
-                else if (days==3) a.append("3-day PPL hits each muscle 1x/wk. Consider 6-day for 2x frequency.\n");
-                else a.append("Consider 6-day PPL for maximum frequency.\n"); break;
+                a.add("PPL is excellent for intermediate lifters and up.");
+                if (days==6) a.add("6-day PPL is the optimal frequency for muscle growth.");
+                else if (days==3) a.add("3-day PPL hits each muscle once a week. A 6-day version doubles that.");
+                else a.add("Consider 6-day PPL for maximum frequency."); break;
             case "Upper/Lower":
-                a.append("Upper/Lower is highly efficient.\n");
-                if (days==4) a.append("✓ 4-day U/L: ideal balance of frequency and recovery.\n");
-                else a.append("Aim for 4 days to hit each muscle 2x/week.\n"); break;
+                a.add("Upper/Lower is highly efficient.");
+                if (days==4) a.add("4 days is the ideal balance of frequency and recovery.");
+                else a.add("Aim for 4 days to hit each muscle twice a week."); break;
             case "Full Body":
-                a.append("Full Body suits beginners and strength athletes.\n");
-                if (days>=3) a.append("✓ "+days+" full body sessions: good stimulus frequency.\n");
-                if (sps>20) a.append("⚠ Sessions may run long — consider supersets.\n"); break;
+                a.add("Full body suits beginners and strength athletes.");
+                if (days>=3) a.add(days + " full-body sessions give a good training frequency.");
+                if (sps>20) a.add("Sessions may run long — consider supersets."); break;
             case "Bro Split / Custom":
-                a.append("Bro split trains each muscle once/week.\n");
-                a.append("✓ Good for high per-session volume.\n");
-                a.append("⚠ Only 1x/week frequency — consider Upper/Lower for more growth.\n"); break;
+                a.add("A bro split trains each muscle once a week, with lots of volume per session.");
+                a.add("Upper/Lower would hit each muscle twice a week for more growth."); break;
             default:
-                a.append("Custom split detected.\n");
-                a.append("Aim to hit each muscle 2x/week for optimal hypertrophy.\n");
+                a.add("Custom split.");
+                a.add("Aim to hit each muscle twice a week for the best growth.");
         }
-        a.append("\nLog sets in Exercise Detail to\ntrack progressive overload over time.\n");
-        return a.toString();
+        a.add("");
+        a.add("Log your sets on each exercise to track progressive overload.");
+        return a;
     }
 }

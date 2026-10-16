@@ -131,14 +131,14 @@ public class BodyFragment extends Fragment {
             return;
         }
 
-        if (chartView != null) chartView.setData(sortedAsc);
+        if (chartView != null) { chartView.setGoal(repo.goalWeightKg); chartView.setData(sortedAsc); }
 
         BodyWeightEntry latest = sortedAsc.get(sortedAsc.size() - 1);
         long ago = java.time.temporal.ChronoUnit.DAYS.between(latest.getDate(), LocalDate.now());
         // Future-dated entries would read "-7 days ago" — show the date instead
         String when = ago == 0 ? "today" : ago == 1 ? "yesterday"
                 : ago > 1 ? ago + " days ago" : formatDate(latest.getDate());
-        lastWeighedText.setText("Last: " + Units.fmt(latest.getWeightKg()) + " — " + when);
+        lastWeighedText.setText(Units.fmt(latest.getWeightKg()) + "  ·  " + when);
 
         buildGoalBar();
         if (adapter != null) adapter.notifyDataSetChanged();

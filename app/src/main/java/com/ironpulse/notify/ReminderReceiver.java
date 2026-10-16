@@ -34,7 +34,8 @@ public class ReminderReceiver extends BroadcastReceiver {
                 ctx.getPackageManager().getLaunchIntentForPackage(ctx.getPackageName()),
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         NotificationCompat.Builder b = new NotificationCompat.Builder(ctx, Notifications.CHANNEL_REMINDER)
-                .setSmallIcon(android.R.drawable.ic_popup_reminder)
+                .setSmallIcon(com.ironpulse.R.drawable.ic_notification)
+                .setColor(0xFF3EE08F)
                 .setContentTitle("Workout day 💪")
                 .setContentText(remaining + (remaining == 1 ? " exercise" : " exercises")
                         + " left today — keep the streak alive!")

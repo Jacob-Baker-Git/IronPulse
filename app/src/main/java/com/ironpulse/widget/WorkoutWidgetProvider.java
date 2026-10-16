@@ -33,24 +33,29 @@ public class WorkoutWidgetProvider extends AppWidgetProvider {
         int streak = repo.computeStreak();
         int potential = streak > 0 ? 0 : repo.computePotentialStreak();
 
-        String streakLine;
-        if (streak > 0)        streakLine = "🔥 " + streak + " day streak";
-        else if (potential > 0) streakLine = "🔥 " + potential + " days — train today!";
-        else                    streakLine = "IronPulse";
-
-        String todayLine;
+        // Same wording as the Today card: "Leg day", "0 of 5 done · 🔥 3 day streak"
+        boolean rest = repo.isRestDay(today);
         List<ExerciseData> planned = repo.getExercisesForDate(today);
-        if (repo.isRestDay(today))      todayLine = "Rest day — recover well 🛌";
-        else if (planned.isEmpty())     todayLine = "Nothing scheduled today";
-        else {
-            int done = repo.completed.getOrDefault(today, Collections.emptyList()).size();
-            todayLine = done >= planned.size() ? "✓ Workout complete!"
-                    : done + " of " + planned.size() + " exercises done";
-        }
+        String title = com.ironpulse.ui.WorkoutFragment.dayTitle(planned, false, rest);
+        List<ExerciseData> doneList = repo.completed.getOrDefault(today, Collections.emptyList());
+        int done = 0;
+        for (ExerciseData ex : planned) if (doneList.contains(ex)) done++;
+
+        String streakPart = streak > 0 ? "🔥 " + streak + " day streak"
+                : potential > 0 ? "train to make it " + (potential + 1) + " days" : "";
+        String todayLine;
+        if (rest)                       todayLine = "Recovery is part of the plan";
+        else if (planned.isEmpty())     todayLine = "Nothing planned — tap to add";
+        else if (done >= planned.size()) todayLine = "✓ Workout complete";
+        else                            todayLine = done + " of " + planned.size() + " done";
+        if (!streakPart.isEmpty()) todayLine += "  ·  " + streakPart;
 
         RemoteViews rv = new RemoteViews(ctx.getPackageName(), R.layout.widget_workout);
-        rv.setTextViewText(R.id.widget_streak, streakLine);
+        rv.setTextViewText(R.id.widget_streak, title);
         rv.setTextViewText(R.id.widget_today, todayLine);
+        rv.setViewVisibility(R.id.widget_bar, planned.isEmpty() || rest
+                ? android.view.View.GONE : android.view.View.VISIBLE);
+        rv.setProgressBar(R.id.widget_bar, Math.max(1, planned.size()), done, false);
         rv.setOnClickPendingIntent(R.id.widget_root, PendingIntent.getActivity(ctx, 0,
                 new Intent(ctx, com.ironpulse.ui.MainActivity.class)
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
