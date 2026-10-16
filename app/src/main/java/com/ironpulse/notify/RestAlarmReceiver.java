@@ -13,11 +13,13 @@ import android.os.Bundle;
  */
 public class RestAlarmReceiver extends BroadcastReceiver {
     @Override public void onReceive(Context ctx, Intent intent) {
-        // Stale alarm (user paused/finished or started a different rest) — ignore.
-        if (RestTimerState.endsAt() == 0
-                || RestTimerState.endsAt() - System.currentTimeMillis() > 2000) return;
         Bundle ex = intent.getExtras();
         if (ex == null) ex = new Bundle();
+        // The end time rides in the intent: RestTimerState is in-memory and reads 0
+        // when Android killed the backgrounded app — the case this alarm exists for.
+        // Pause/finish cancel the alarm and a restart replaces it, so this is current.
+        long endsAt = ex.getLong(RestNotifier.ENDS_AT, RestTimerState.endsAt());
+        if (endsAt == 0 || endsAt - System.currentTimeMillis() > 2000) return;
         RestNotifier.postRestOver(ctx, ex);
         RestTimerState.clear();
     }

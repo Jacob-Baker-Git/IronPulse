@@ -25,6 +25,8 @@ public final class RestNotifier {
     public static final String REST    = "restSeconds";
     public static final String TARGET  = "targetSets";
     public static final String LOGGED  = "loggedSets";
+    /** End time of the rest, carried in the alarm so it survives the process being killed. */
+    public static final String ENDS_AT = "endsAt";
 
     private RestNotifier() {}
 
@@ -95,8 +97,11 @@ public final class RestNotifier {
     /** Backgrounded "rest over" alert — inexact is fine for a gym timer. */
     public static void scheduleAlarm(Context ctx, Bundle ex) {
         AlarmManager am = ctx.getSystemService(AlarmManager.class);
-        if (am != null) am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,
-                RestTimerState.endsAt(), alarmIntent(ctx, ex));
+        if (am == null) return;
+        Bundle withEnd = new Bundle(ex);
+        withEnd.putLong(ENDS_AT, RestTimerState.endsAt());
+        am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,
+                RestTimerState.endsAt(), alarmIntent(ctx, withEnd));
     }
 
     public static void cancelAlarm(Context ctx) {

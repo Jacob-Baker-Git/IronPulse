@@ -113,7 +113,7 @@ class SettingsTab {
         host.sp(c, 6);
         host.infoRow(c, "Data location", "App internal storage");
         host.infoRow(c, "Auto-save", "On every change");
-        host.infoRow(c, "Exercise schedule", "Every 7 days from added date"); host.sp(c, 16);
+        host.infoRow(c, "Exercise schedule", "Weekly, on the days you pick"); host.sp(c, 16);
 
         // Backup — everything lives in internal storage, so give users a way out
         Button exp = host.btn(c, "Export Data (backup)", host.color(R.color.accent));
@@ -134,6 +134,7 @@ class SettingsTab {
                     .setPositiveButton("Delete Everything", (d2, w2) -> {
                         host.repo.clearAll();
                         Toast.makeText(host.requireContext(), "All data cleared", Toast.LENGTH_SHORT).show();
+                        host.requireActivity().recreate(); // every screen rebuilds against the empty data
                     })
                     .setNegativeButton("Cancel", null).show()
             )

@@ -6,8 +6,8 @@ macros and body weight — and get the whole thing scored back at you.
 
 **It has no `INTERNET` permission.** Everything is stored in the app's private
 storage on the device. There is no account, no sync, no analytics and no
-third-party SDK; the only way data leaves the phone is a backup file the user
-exports themselves.
+third-party SDK. Data leaves the phone only in a backup file the user exports
+themselves, or through Android's own system backup if the user has it turned on.
 
 ## Features
 

@@ -4,3 +4,9 @@
 /app/build/intermediates/javac/debug/classes/
 # Local verification screenshots
 *.png
+
+# Signing + machine-local config — never commit
+*.keystore
+*.jks
+keystore.properties
+local.properties

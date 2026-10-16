@@ -22,7 +22,7 @@ public class ExerciseData {
 
     public ExerciseData(String name, String weightStr, String reps, int restSeconds, LocalDate addedDate) {
         this.id=UUID.randomUUID().toString();
-        this.name=name; this.restSeconds=restSeconds; this.addedDate=addedDate;
+        this.name=cleanName(name); this.restSeconds=restSeconds; this.addedDate=addedDate;
         this.days=new ArrayList<>(Collections.singletonList(addedDate.getDayOfWeek().name()));
         setReps(reps);
         parseWeight(weightStr);
@@ -63,7 +63,10 @@ public class ExerciseData {
 
     public String getId() { return id; }
     public String getName() { return name; }
-    public void setName(String n) { this.name=n; }
+    public void setName(String n) { this.name=cleanName(n); }
+
+    /** "|" is the field separator in completed.json and custom templates. */
+    static String cleanName(String n) { return n == null ? null : n.replace("|", "/"); }
     public double getWeightKg() { return weightKg; }
     public boolean isBodyweight() { return isBodyweight; }
     public int getSets() { return Math.max(1, sets); }

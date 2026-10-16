@@ -161,31 +161,55 @@ public class MoreFragment extends Fragment {
 
     private void importData(android.net.Uri uri) {
         Set<String> known = new HashSet<>(Arrays.asList(AppRepository.DATA_FILES));
-        int restored = 0;
+        // Stage the whole backup and parse every file BEFORE touching live data,
+        // so a broken zip or bad JSON can't leave a mix of old and new.
+        java.io.File stage = new java.io.File(requireContext().getCacheDir(), "import");
+        deleteDir(stage);
+        stage.mkdirs();
+        Set<String> restored = new HashSet<>();
         try (java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(
                 requireContext().getContentResolver().openInputStream(uri))) {
             java.util.zip.ZipEntry e;
             while ((e = zis.getNextEntry()) != null) {
                 // Whitelist match also guards against zip-slip paths
                 if (!known.contains(e.getName())) continue;
-                java.io.File target = new java.io.File(requireContext().getFilesDir(), e.getName());
-                try (java.io.FileOutputStream out = new java.io.FileOutputStream(target)) {
+                java.io.File staged = new java.io.File(stage, e.getName());
+                try (java.io.FileOutputStream out = new java.io.FileOutputStream(staged)) {
                     byte[] buf = new byte[8192]; int n;
                     while ((n = zis.read(buf)) > 0) out.write(buf, 0, n);
                 }
-                restored++;
+                try (java.io.Reader r = new java.io.FileReader(staged)) {
+                    com.google.gson.JsonParser.parseReader(r); // throws on malformed JSON
+                }
+                restored.add(e.getName());
             }
         } catch (Exception ex) {
+            deleteDir(stage);
             Toast.makeText(requireContext(), "Import failed — not a valid IronPulse backup", Toast.LENGTH_LONG).show();
             return;
         }
-        if (restored == 0) {
+        if (restored.isEmpty()) {
+            deleteDir(stage);
             Toast.makeText(requireContext(), "No IronPulse data found in that file", Toast.LENGTH_LONG).show();
             return;
         }
+        // Let queued saves from the current data finish so none lands on top of the import
+        repo.awaitPendingSaves();
+        for (String name : AppRepository.DATA_FILES) {
+            java.io.File live = new java.io.File(requireContext().getFilesDir(), name);
+            live.delete(); // files missing from the backup are cleared too — import replaces
+            if (restored.contains(name)) new java.io.File(stage, name).renameTo(live);
+        }
+        deleteDir(stage);
         Toast.makeText(requireContext(), "Backup imported", Toast.LENGTH_SHORT).show();
         AppRepository.invalidate();
         requireActivity().recreate(); // every screen rebuilds against the imported data
+    }
+
+    private static void deleteDir(java.io.File dir) {
+        java.io.File[] files = dir.listFiles();
+        if (files != null) for (java.io.File f : files) f.delete();
+        dir.delete();
     }
 
     // ── Shared view helpers (used by the tab classes) ────────────────────────

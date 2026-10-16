@@ -149,13 +149,22 @@ public class AppRepository {
         return null;
     }
 
-    /** Renames an exercise and carries its logged-set history along with it. */
+    /** Renames an exercise and carries its logged-set history and PR along with it. */
     public void renameExercise(ExerciseData ex, String newName) {
         String old = ex.getName();
-        if (newName == null || newName.trim().isEmpty() || newName.equals(old)) return;
+        if (newName == null || newName.trim().isEmpty() || newName.trim().equals(old)) return;
         ex.setName(newName.trim());
+        String nu = ex.getName(); // as cleaned by the model
         for (SetLog s : setLogs)
-            if (s.getExerciseName().equals(old)) s.setExerciseName(newName.trim());
+            if (s.getExerciseName().equals(old)) s.setExerciseName(nu);
+        boolean newHasRecord = false;
+        for (RecordData r : records) if (r.getName().equalsIgnoreCase(nu)) newHasRecord = true;
+        if (!newHasRecord)
+            for (int i = 0; i < records.size(); i++)
+                if (records.get(i).getName().equalsIgnoreCase(old)) {
+                    records.set(i, new RecordData(nu, records.get(i).getWeight()));
+                    break;
+                }
         saveAsync();
     }
 
@@ -200,7 +209,7 @@ public class AppRepository {
             // Full data so deleted-exercise history can be reconstructed after restart:
             // name|addedDate|weight|reps|restSeconds|id
             for (ExerciseData ex : e.getValue())
-                names.add(ex.getName()+"|"+ex.getAddedDate()+"|"
+                names.add(ex.getName().replace("|","/")+"|"+ex.getAddedDate()+"|"
                         +(ex.isBodyweight()?"BW":ex.getWeight())+"|"+ex.getReps()+"|"+ex.getRestSeconds()
                         +"|"+ex.getId());
             compSnap.put(e.getKey().toString(), names);
@@ -235,9 +244,12 @@ public class AppRepository {
             saveJson("foods.json", foodsSnap);
             saveJson("foodlog.json", foodLogSnap);
             saveJson("prefs.json", prefsSnap);
-            // Data just changed — keep any launcher widgets in sync
+        });
+        // Data just changed — keep any launcher widgets in sync. Main thread: the
+        // widget reads the live lists, which only the UI thread mutates.
+        mainHandler.post(() -> {
             try { com.ironpulse.widget.WorkoutWidgetProvider.updateAll(context); }
-            catch (Exception ignored) {}
+            catch (Exception e) { android.util.Log.e("IronPulse","Widget update failed",e); }
         });
     }
 
@@ -315,23 +327,38 @@ public class AppRepository {
             Object ma=prefs.get("macroActual"); if (ma instanceof List) { List<?> l=(List<?>)ma; for (int i=0;i<Math.min(4,l.size());i++) macroActual[i]=String.valueOf(l.get(i)); }
         }
         Units.setUseLbs(useLbs);
-        if (records.isEmpty()) {
-            records.add(new RecordData("Squat",""));
-            records.add(new RecordData("Bench Press",""));
-            records.add(new RecordData("Deadlift",""));
-            records.add(new RecordData("Overhead Press",""));
-            records.add(new RecordData("Barbell Row",""));
-        }
+        if (records.isEmpty()) seedDefaultRecords();
+    }
+
+    private void seedDefaultRecords() {
+        for (String lift : new String[]{"Squat","Bench Press","Deadlift","Overhead Press","Barbell Row"})
+            records.add(new RecordData(lift,""));
+    }
+
+    /**
+     * Blocks until every queued save has hit disk and drops a pending debounced
+     * one, so nothing from the current data can land after this returns.
+     */
+    public void awaitPendingSaves() {
+        mainHandler.removeCallbacks(pendingSave);
+        try { ioExecutor.submit(() -> {}).get(5, TimeUnit.SECONDS); }
+        catch (Exception e) { android.util.Log.e("IronPulse","Pending saves did not finish",e); }
     }
 
     public void clearAll() {
+        awaitPendingSaves();
         exercises.clear(); completed.clear(); bodyEntries.clear();
         records.clear(); cardio.clear(); setLogs.clear(); restDays.clear(); customSplits.clear();
         foodLog.clear(); savedFoods.clear(); achievements.clear();
         Arrays.fill(macroGoals,""); Arrays.fill(macroActual,"");
-        startWeightKg = 0; goalWeightKg = 0;
+        heightCm = 0; startWeightKg = 0; goalWeightKg = 0;
         gender = ""; // re-asked on next launch
-        for (String f : DATA_FILES) new File(context.getFilesDir(),f).delete();
+        reminderEnabled = false;
+        com.ironpulse.notify.Reminders.cancel(context);
+        seedDefaultRecords();
+        // Theme and units are kept; everything else is written out empty
+        // (which also refreshes the widget).
+        saveAsync();
     }
 
     /** Sum of a macro across today's logged foods. idx: 0=cals 1=protein 2=carbs 3=fats */
@@ -363,8 +390,10 @@ public class AppRepository {
         if (!f.exists()) return null;
         try (Reader r=new FileReader(f)) { return gson.fromJson(r,type); }
         catch(JsonSyntaxException e) {
-            android.util.Log.e("IronPulse","Corrupt JSON in "+filename+" — resetting",e);
-            f.delete(); return null;
+            // Set aside, never delete — the data may still be recoverable by hand
+            android.util.Log.e("IronPulse","Corrupt JSON in "+filename+" — moved to .corrupt",e);
+            File bad=new File(context.getFilesDir(),filename+".corrupt");
+            bad.delete(); f.renameTo(bad); return null;
         } catch(Exception e) {
             android.util.Log.e("IronPulse","Failed to load "+filename,e);
             return null;

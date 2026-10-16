@@ -61,4 +61,12 @@ public class ExerciseDataTest {
         assertEquals(82.5, new ExerciseData("Bench", "82,5", "3x10", 90, MONDAY).getWeightKg(), 0.001);
         assertEquals(60.0, new ExerciseData("Bench", "60 kg", "3x10", 90, MONDAY).getWeightKg(), 0.001);
     }
+
+    /** "|" separates fields in completed.json — a name containing it lost the whole day on reload. */
+    @Test public void namesNeverContainTheFieldSeparator() {
+        ExerciseData ex = new ExerciseData("Bench | incline", "60", "3x10", 90, MONDAY);
+        assertEquals("Bench / incline", ex.getName());
+        ex.setName("A|B");
+        assertEquals("A/B", ex.getName());
+    }
 }
