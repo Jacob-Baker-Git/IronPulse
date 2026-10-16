@@ -86,6 +86,11 @@ public class ExerciseDetailActivity extends AppCompatActivity {
         findViewById(R.id.btn_back).setOnClickListener(v -> finish());
         ((TextView) findViewById(R.id.weight_field_label))
                 .setText("Weight (" + Units.unit() + " or BW)");
+        // One filled action (Log set); Pause and Plates stay quiet
+        ButtonStyles.log(logSetBtn);
+        logSetBtn.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 16);
+        ButtonStyles.edit(pauseBtn);
+        ButtonStyles.edit(findViewById(R.id.btn_plates));
         findViewById(R.id.btn_plates).setOnClickListener(v -> {
             // Prefer what's typed in the weight field, fall back to the plan weight
             double kg = Units.parseToKg(weightField.getText().toString());

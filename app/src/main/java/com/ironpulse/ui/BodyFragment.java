@@ -24,8 +24,6 @@ public class BodyFragment extends Fragment {
     private RecyclerView recycler;
     private EntryAdapter adapter;
     private LinearLayoutManager layoutManager;
-    private Button editBtn;
-    private boolean editMode = false;
     /** Newest-first list backing the log (sorted ascending, then reversed for display). */
     private final List<BodyWeightEntry> sortedAsc = new ArrayList<>();
 
@@ -45,40 +43,33 @@ public class BodyFragment extends Fragment {
         chartView       = v.findViewById(R.id.weight_chart);
         goalContainer   = v.findViewById(R.id.goal_container);
         recycler        = v.findViewById(R.id.body_recycler);
-        editBtn         = v.findViewById(R.id.btn_body_edit);
 
-        heightBtn.setText(repo.heightCm > 0 ? String.format(java.util.Locale.US, "%.0f cm", repo.heightCm) : "Set Height");
+        heightBtn.setText(heightLabel());
         heightBtn.setOnClickListener(x -> showHeightDialog());
-        Button addBtn = v.findViewById(R.id.btn_add_weight);
-        ButtonStyles.log(addBtn);
-        addBtn.setOnClickListener(x -> showWeightDialog(null));
+        v.findViewById(R.id.btn_add_weight).setOnClickListener(x -> showWeightDialog(null));
 
-        ButtonStyles.toggle(editBtn, false);
-        editBtn.setOnClickListener(x -> {
-            editMode = !editMode;
-            editBtn.setText(editMode ? "Done" : "Edit");
-            ButtonStyles.toggle(editBtn, editMode);
-            if (adapter != null) adapter.notifyDataSetChanged();
-        });
-
-        Button clearBtn = v.findViewById(R.id.btn_clear_weight);
-        ButtonStyles.delete(clearBtn);
-        clearBtn.setOnClickListener(x -> {
-            if (repo.bodyEntries.isEmpty()) {
-                Toast.makeText(requireContext(), "No entries to clear", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            Dialogs.confirm(requireContext(), "Clear all entries",
-                    "Are you sure you want to delete ALL " + repo.bodyEntries.size()
-                            + " weight entries? This cannot be undone.", "Delete All", () -> {
-                repo.bodyEntries.clear();
-                repo.saveAsync();
-                editMode = false; editBtn.setText("Edit"); ButtonStyles.toggle(editBtn, false);
-                refresh();
+        // Rare actions live behind ⋮; entries are edited/deleted by long-press
+        View menuBtn = v.findViewById(R.id.btn_body_menu);
+        menuBtn.setOnClickListener(x -> {
+            PopupMenu m = new PopupMenu(requireContext(), menuBtn);
+            m.getMenu().add(0, 1, 0, repo.heightCm > 0 ? "Change height" : "Set height");
+            if (!repo.bodyEntries.isEmpty()) m.getMenu().add(0, 2, 1, "Clear weight log…");
+            m.setOnMenuItemClickListener(item -> {
+                if (item.getItemId() == 1) showHeightDialog();
+                else Dialogs.confirm(requireContext(), "Clear weight log",
+                        "Delete all " + repo.bodyEntries.size()
+                                + " weight entries? This cannot be undone.", "Delete all", () -> {
+                    repo.bodyEntries.clear();
+                    repo.saveAsync();
+                    refresh();
+                });
+                return true;
             });
+            m.show();
         });
 
         if (chartView != null) {
+            chartView.setBackgroundResource(R.drawable.tile_bg); chartView.setClipToOutline(true); // rounded like the cards
             chartView.setBgColor(themeColor(R.attr.colorCardBg));
             chartView.setTextColor(themeColor(R.attr.colorTextMuted));
             // Dragging the graph scrolls the log, which in turn drives the graph.
@@ -381,41 +372,25 @@ public class BodyFragment extends Fragment {
             h.val.setText(val.toString());
             h.divider.setBackgroundColor(color(R.color.border));
 
-            // Edit-mode buttons (added/removed dynamically)
-            while (h.row.getChildCount() > 2) h.row.removeViewAt(2);
-            if (editMode) {
-                Button eb = new Button(requireContext());
-                eb.setText("Edit"); ButtonStyles.edit(eb);
-                LinearLayout.LayoutParams elp = new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                elp.setMargins(6, 0, 0, 0); eb.setLayoutParams(elp);
-                eb.setOnClickListener(x -> showWeightDialog(e));
-
-                Button db = new Button(requireContext());
-                db.setText("Delete"); ButtonStyles.delete(db);
-                LinearLayout.LayoutParams dlp = new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                dlp.setMargins(6, 0, 0, 0); db.setLayoutParams(dlp);
-                db.setOnClickListener(x -> Dialogs.confirmDelete(requireContext(),
-                        String.format(java.util.Locale.US, "the entry for %s (%.1f kg)", formatDate(e.getDate()), e.getWeightKg()), () -> {
-                    repo.bodyEntries.remove(e);
-                    repo.saveAsync();
-                    if (repo.bodyEntries.isEmpty()) { editMode = false; editBtn.setText("Edit");
-                        ButtonStyles.toggle(editBtn, false); }
-                    refresh();
-                }));
-                h.row.addView(eb); h.row.addView(db);
-            }
+            h.itemView.setOnClickListener(x -> showWeightDialog(e));
+            Dialogs.longPressEditDelete(h.itemView, () -> showWeightDialog(e), () ->
+                    Dialogs.confirmDelete(requireContext(), "the entry for " + formatDate(e.getDate())
+                            + " (" + Units.fmt(e.getWeightKg()) + ")", () -> {
+                        repo.bodyEntries.remove(e);
+                        repo.saveAsync();
+                        refresh();
+                    }));
         }
 
         @Override public int getItemCount() { return sortedAsc.size(); }
     }
 
     private String formatDate(LocalDate d) {
-        return d.getDayOfWeek().toString().substring(0, 3) + " "
-                + d.getDayOfMonth() + " "
-                + d.getMonth().toString().substring(0, 3) + " "
-                + d.getYear();
+        return d.format(java.time.format.DateTimeFormatter.ofPattern("EEE d MMM yyyy", java.util.Locale.ENGLISH));
+    }
+
+    private String heightLabel() {
+        return repo.heightCm > 0 ? String.format(java.util.Locale.US, "%.0f cm  ›", repo.heightCm) : "Set height  ›";
     }
 
     /** Pass null to add a new entry, pass existing entry to edit it */
@@ -483,7 +458,7 @@ public class BodyFragment extends Fragment {
                     if (cm <= 0 || cm > 300) throw new NumberFormatException();
                     repo.heightCm = cm;
                     repo.saveAsync();
-                    heightBtn.setText(String.format(java.util.Locale.US, "%.0f cm", repo.heightCm));
+                    heightBtn.setText(heightLabel());
                     refresh();
                 } catch (Exception e) {
                     Toast.makeText(requireContext(), "Invalid height", Toast.LENGTH_SHORT).show();

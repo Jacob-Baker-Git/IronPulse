@@ -24,13 +24,13 @@ public class MonthHeatmapView extends View {
     private int[] statuses = new int[0];
     private OnMonthChangeListener listener;
 
-    private int bgColor   = 0xFF181E2C;
-    private int textCol   = 0xFF72889E;
-    private static final int COL_COMPLETE = 0xFF22C882;
-    private static final int COL_MISSED   = 0x99E64444;
-    private static final int COL_REST     = 0x66128E8A;
-    private static final int COL_PLANNED  = 0x44888888;
-    private static final int COL_EMPTY    = 0x16888888;
+    private int bgColor   = 0xFF151A22;
+    private int textCol   = 0xFF6B7686;
+    private static final int COL_COMPLETE = 0xFF3EE08F;
+    private static final int COL_MISSED   = 0x66E5484D;
+    private static final int COL_REST     = 0x33128E8A;
+    private static final int COL_PLANNED  = 0x26888888;
+    private static final int COL_EMPTY    = 0x10888888;
 
     private final Paint cellPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);

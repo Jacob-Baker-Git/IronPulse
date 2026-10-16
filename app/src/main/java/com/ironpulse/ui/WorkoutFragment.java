@@ -2,7 +2,7 @@ package com.ironpulse.ui;
 
 import android.app.AlertDialog;
 import android.content.Intent;
-import android.graphics.Color;
+import android.graphics.Typeface;
 import android.os.Bundle;
 import android.view.*;
 import android.widget.*;
@@ -10,7 +10,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.*;
-import com.google.android.material.chip.Chip;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.ironpulse.R;
 import com.ironpulse.data.AppRepository;
@@ -21,47 +20,48 @@ import java.time.*;
 import java.time.format.*;
 import java.util.*;
 
+/**
+ * Today: a headline card (what the day is + progress), the week, and the day's
+ * exercises. Tap a row to log it, tap its ring to tick it off, long-press to edit
+ * or delete. Rarer actions (templates, rest day, reorder) live behind ⋮.
+ */
 public class WorkoutFragment extends Fragment {
 
     private AppRepository repo;
-    private LocalDate selectedDate = LocalDate.now();
-    private RecyclerView dateStripRv;
-    private DateStripAdapter dateStripAdapter;
-    private androidx.recyclerview.widget.LinearSnapHelper snapHelper;
+    private LocalDate today = LocalDate.now();
+    private LocalDate selectedDate = today;
+    private LinearLayout weekRow;
+    private TextView dateLabel, heroTitle, heroSub, emptyText;
+    private ProgressBar heroBar;
     private RecyclerView exerciseRecycler;
-    private TextView streakText;
-    private ProgressBar streakBar;
-    private boolean editMode = false;
-    private Button editBtn;
+    private FloatingActionButton fab;
+    private ImageButton menuBtn;
+    private boolean reorderMode = false;
     private ExerciseAdapter adapter;
-    private LinearLayout emptyState;
-    private Button restDayBtn;
-    private TextView emptyText;
     private ItemTouchHelper touchHelper;
-    private LocalDate stripBaseDate = LocalDate.now();
 
     @Nullable @Override
     public View onCreateView(@NonNull LayoutInflater inf, @Nullable ViewGroup parent, @Nullable Bundle state) {
         repo = AppRepository.get(requireContext());
         View v = inf.inflate(R.layout.fragment_workout, parent, false);
 
-        dateStripRv    = v.findViewById(R.id.date_strip_rv);
+        weekRow          = v.findViewById(R.id.week_row);
+        dateLabel        = v.findViewById(R.id.date_label);
+        heroTitle        = v.findViewById(R.id.hero_title);
+        heroSub          = v.findViewById(R.id.hero_sub);
+        heroBar          = v.findViewById(R.id.hero_bar);
+        emptyText        = v.findViewById(R.id.empty_text);
         exerciseRecycler = v.findViewById(R.id.exercise_recycler);
-        streakText     = v.findViewById(R.id.streak_text);
-        streakBar      = v.findViewById(R.id.streak_bar);
-        editBtn        = v.findViewById(R.id.btn_edit);
-        emptyState     = v.findViewById(R.id.empty_state);
-        emptyText      = v.findViewById(R.id.empty_text);
-        restDayBtn     = v.findViewById(R.id.btn_rest_day);
+        fab              = v.findViewById(R.id.fab_add);
+        menuBtn          = v.findViewById(R.id.btn_menu);
 
-        // Set up RecyclerView
         adapter = new ExerciseAdapter();
         exerciseRecycler.setLayoutManager(new LinearLayoutManager(getContext()));
         exerciseRecycler.setAdapter(adapter);
 
-        // Swipe to delete + drag to reorder
+        // Drag to reorder — only in reorder mode, started from the ≡ handle
         touchHelper = new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(
-                ItemTouchHelper.UP | ItemTouchHelper.DOWN, ItemTouchHelper.LEFT) {
+                ItemTouchHelper.UP | ItemTouchHelper.DOWN, 0) {
             @Override public boolean onMove(@NonNull RecyclerView rv,
                     @NonNull RecyclerView.ViewHolder vh, @NonNull RecyclerView.ViewHolder t) {
                 int from = vh.getAdapterPosition();
@@ -71,369 +71,264 @@ public class WorkoutFragment extends Fragment {
                 if (from < exercises.size() && to < exercises.size()) {
                     ExerciseData moved = exercises.get(from);
                     int fi = repo.exercises.indexOf(moved);
-                    ExerciseData target = exercises.get(to);
-                    int ti = repo.exercises.indexOf(target);
+                    int ti = repo.exercises.indexOf(exercises.get(to));
                     if (fi >= 0 && ti >= 0) {
                         repo.exercises.remove(fi);
                         repo.exercises.add(ti, moved);
+                        adapter.items.add(to, adapter.items.remove(from));
                         adapter.notifyItemMoved(from, to);
                         repo.saveAsync();
                     }
                 }
                 return true;
             }
-            @Override public void onSwiped(@NonNull RecyclerView.ViewHolder vh, int dir) {
-                int pos = vh.getAdapterPosition();
-                if (pos == RecyclerView.NO_POSITION) return;
-                List<ExerciseData> exercises = repo.getExercisesForDate(selectedDate);
-                if (pos >= exercises.size()) { adapter.notifyItemChanged(pos); return; }
-                ExerciseData ex = exercises.get(pos);
-                new AlertDialog.Builder(requireContext())
-                    .setTitle("Delete Exercise")
-                    .setMessage("Remove \"" + ex.getName() + "\" from every "
-                            + ex.daysLabel() + "?")
-                    .setPositiveButton("Delete", (d, w) -> {
-                        repo.exercises.remove(ex);
-                        if (repo.getExercisesForDate(selectedDate).isEmpty()) {
-                            editMode = false; editBtn.setText("Edit");
-                            editBtn.setBackgroundResource(R.drawable.btn_primary);
-                        }
-                        repo.saveAsync(); refreshDateStrip(); refreshExercises();
-                    })
-                    .setNegativeButton("Cancel", (d, w) -> adapter.notifyItemChanged(pos))
-                    // Dismiss via back/outside-tap must also restore the swiped card
-                    .setOnCancelListener(d -> adapter.notifyItemChanged(pos))
-                    .show();
-            }
-            // Only allow swipe in edit mode
-            @Override public int getSwipeDirs(@NonNull RecyclerView rv, @NonNull RecyclerView.ViewHolder vh) {
-                return editMode ? super.getSwipeDirs(rv, vh) : 0;
-            }
+            @Override public void onSwiped(@NonNull RecyclerView.ViewHolder vh, int dir) {}
+            @Override public boolean isLongPressDragEnabled() { return false; }
         });
         touchHelper.attachToRecyclerView(exerciseRecycler);
 
-        v.findViewById(R.id.btn_template).setOnClickListener(x -> showTemplateDialog());
-        ((FloatingActionButton) v.findViewById(R.id.fab_add)).setOnClickListener(x -> showAddDialog());
+        fab.setOnClickListener(x -> showAddDialog());
+        menuBtn.setOnClickListener(x -> showMenu());
+        dateLabel.setOnClickListener(x -> select(today)); // "tap for today" when looking elsewhere
 
-        restDayBtn.setOnClickListener(x -> {
-            java.time.DayOfWeek dow = selectedDate.getDayOfWeek();
-            if (repo.restDays.contains(dow)) {
-                repo.restDays.remove(dow);
-            } else {
-                repo.restDays.add(dow);
+        // Swipe the week row for the previous / next week
+        GestureDetector swipe = new GestureDetector(requireContext(), new GestureDetector.SimpleOnGestureListener() {
+            @Override public boolean onDown(@NonNull MotionEvent e) { return true; }
+            @Override public boolean onFling(@Nullable MotionEvent a, @NonNull MotionEvent b, float vx, float vy) {
+                if (a == null || Math.abs(b.getX() - a.getX()) < dp(40) || Math.abs(vx) < Math.abs(vy)) return false;
+                select(selectedDate.plusWeeks(b.getX() < a.getX() ? 1 : -1));
+                return true;
             }
-            repo.saveAsync();
-            refreshDateStrip();
-            refreshExercises();
-            updateStreak();
+            @Override public boolean onSingleTapUp(@NonNull MotionEvent e) {
+                int i = (int) (e.getX() / (weekRow.getWidth() / 7f));
+                select(monday(selectedDate).plusDays(Math.max(0, Math.min(6, i))));
+                return true;
+            }
         });
+        weekRow.setOnTouchListener((w, e) -> swipe.onTouchEvent(e));
 
-        editBtn.setOnClickListener(x -> {
-            editMode = !editMode;
-            editBtn.setText(editMode ? "Done" : "Edit");
-            adapter.notifyDataSetChanged();
-        });
-
-        buildDateStrip(); // centres on today once the strip is laid out
         refreshExercises();
-        updateStreak();
         return v;
     }
 
     @Override public void onResume() {
         super.onResume();
-        // If the app stayed open past midnight, rebuild the strip around the new today
-        if (!stripBaseDate.equals(LocalDate.now())) {
-            stripBaseDate = LocalDate.now();
-            selectedDate = LocalDate.now();
-            buildDateStrip(); // re-centres via its layout listener
+        // If the app stayed open past midnight, move to the new today
+        if (!today.equals(LocalDate.now())) {
+            today = LocalDate.now();
+            selectedDate = today;
         }
-        refreshDateStrip();
         refreshExercises();
-        updateStreak();
     }
 
-    // ── Date strip ───────────────────────────────────────────────────────────
-
-    private void buildDateStrip() {
-        LocalDate today = LocalDate.now();
-        stripBaseDate = today;
-
-        androidx.recyclerview.widget.LinearLayoutManager lm =
-                new androidx.recyclerview.widget.LinearLayoutManager(
-                        getContext(), androidx.recyclerview.widget.LinearLayoutManager.HORIZONTAL, false);
-        dateStripRv.setLayoutManager(lm);
-
-        // Padding so first/last items can be centered. Must wait for a real layout
-        // (width > 0), then apply padding + scroll anchor together so they take
-        // effect in the same layout pass — posting them separately lets scroll
-        // listeners run against a half-initialised strip and select the wrong day.
-        dateStripRv.getViewTreeObserver().addOnGlobalLayoutListener(
-                new ViewTreeObserver.OnGlobalLayoutListener() {
-            @Override public void onGlobalLayout() {
-                if (dateStripRv.getWidth() == 0) return;
-                dateStripRv.getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                int half = dateStripRv.getWidth() / 2 - dpToPx(28); // 28 = half of 56dp cell
-                dateStripRv.setPadding(half, 0, half, 0);
-                dateStripRv.stopScroll();
-                selectedDate = stripBaseDate; // undo any selection made mid-initialisation
-                lm.scrollToPositionWithOffset(7, 0); // today is index 7 (strip spans -7..+21)
-                dateStripRv.post(() -> applyCompassScale(dateStripRv));
-                refreshExercises();
-            }
-        });
-
-        dateStripAdapter = new DateStripAdapter(today, -7, 21);
-        dateStripRv.setAdapter(dateStripAdapter);
-
-        // buildDateStrip can run again (midnight rebuild) — never stack listeners.
-        // Must run BEFORE attaching the snap helper: it registers its own scroll
-        // listener, and clearing afterwards kills snap-on-release (strip would rest
-        // between two cells instead of settling on the nearest one).
-        dateStripRv.clearOnScrollListeners();
-
-        // Detach any previous helper first — attaching a second one throws
-        if (snapHelper != null) snapHelper.attachToRecyclerView(null);
-        snapHelper = new androidx.recyclerview.widget.LinearSnapHelper();
-        snapHelper.attachToRecyclerView(dateStripRv);
-
-        dateStripRv.addOnScrollListener(new RecyclerView.OnScrollListener() {
-            @Override public void onScrolled(@NonNull RecyclerView rv, int dx, int dy) {
-                applyCompassScale(rv);
-            }
-            @Override public void onScrollStateChanged(@NonNull RecyclerView rv, int state) {
-                if (state == RecyclerView.SCROLL_STATE_IDLE) {
-                    if (rv.getPaddingLeft() <= 0) return; // strip not centred yet
-                    View snap = snapHelper.findSnapView(lm);
-                    if (snap != null) {
-                        int pos = rv.getChildAdapterPosition(snap);
-                        if (pos != RecyclerView.NO_POSITION) {
-                            LocalDate snapped = today.plusDays(pos - 7);
-                            if (!snapped.equals(selectedDate)) {
-                                selectedDate = snapped;
-                                if (selectedDate.isBefore(LocalDate.now()) && editMode) {
-                                    editMode = false;
-                                    editBtn.setText("Edit");
-                                    editBtn.setBackgroundResource(R.drawable.btn_primary);
-                                }
-                                dateStripAdapter.notifyDataSetChanged();
-                                refreshExercises();
-                            }
-                        }
-                    }
-                }
-            }
-        });
+    private void select(LocalDate d) {
+        selectedDate = d;
+        if (d.isBefore(today)) reorderMode = false;
+        refreshExercises();
     }
 
-    private void applyCompassScale(RecyclerView rv) {
-        float centerX = rv.getWidth() / 2f;
-        for (int i = 0; i < rv.getChildCount(); i++) {
-            View child = rv.getChildAt(i);
-            View box = child.findViewById(R.id.cell_box);
-            if (box == null) continue;
-            float itemCenter = child.getLeft() + child.getWidth() / 2f;
-            float distance = Math.abs(centerX - itemCenter);
-            // Distance measured in cell-widths so the falloff is sharp:
-            // only the centered cell grows, neighbours sit back at 1.0.
-            // Cells sit close together (3dp margins → 6dp gaps) so the grown centre
-            // is capped at 1.18x, leaving a ~1dp gap to neighbours instead of overlapping.
-            float ratio = Math.min(distance / child.getWidth(), 1f);
-            float scale = 1.18f - (0.18f * ratio);
-            box.setScaleX(scale);
-            box.setScaleY(scale);
-        }
-    }
+    private static LocalDate monday(LocalDate d) { return d.with(DayOfWeek.MONDAY); }
 
+    // ── Week row ─────────────────────────────────────────────────────────────
+
+    /** Kept under its old name: the dialogs below call it after changing the plan. */
     private void refreshDateStrip() {
-        if (dateStripAdapter != null) {
-            dateStripAdapter.notifyDataSetChanged();
-            dateStripRv.post(() -> applyCompassScale(dateStripRv));
-        }
+        weekRow.removeAllViews();
+        LocalDate start = monday(selectedDate);
+        for (int i = 0; i < 7; i++) weekRow.addView(dayCell(start.plusDays(i)));
     }
 
-    private int dpToPx(int dp) {
-        return Math.round(dp * getResources().getDisplayMetrics().density);
-    }
+    private View dayCell(LocalDate d) {
+        LinearLayout cell = new LinearLayout(requireContext());
+        cell.setOrientation(LinearLayout.VERTICAL);
+        cell.setGravity(Gravity.CENTER_HORIZONTAL);
+        cell.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
-    // ── Date strip adapter ────────────────────────────────────────────────────
+        TextView letter = new TextView(requireContext());
+        letter.setText(d.getDayOfWeek().getDisplayName(TextStyle.NARROW, Locale.ENGLISH));
+        letter.setTextSize(11);
+        letter.setTextColor(themeColor(R.attr.colorTextMuted));
+        letter.setGravity(Gravity.CENTER);
+        letter.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        cell.addView(letter);
 
-    private class DateStripAdapter extends RecyclerView.Adapter<DateStripAdapter.DVH> {
-        private final LocalDate origin;
-        private final int start, end;
-
-        DateStripAdapter(LocalDate today, int start, int end) {
-            this.origin = today;
-            this.start = start;
-            this.end = end;
-        }
-
-        @NonNull @Override
-        public DVH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View cell = LayoutInflater.from(parent.getContext())
-                    .inflate(R.layout.item_date_cell, parent, false);
-            return new DVH(cell);
-        }
-
-        @Override
-        public void onBindViewHolder(@NonNull DVH h, int position) {
-            LocalDate date = origin.plusDays(start + position);
-            LocalDate today = LocalDate.now();
-            boolean hasWork = !repo.getExercisesForDate(date).isEmpty();
-            boolean isRest  = repo.isRestDay(date);
-            boolean isPast  = date.isBefore(today);
-
-            h.dayLbl.setText(date.format(DateTimeFormatter.ofPattern("EEE")).toUpperCase(java.util.Locale.ROOT));
-            h.numLbl.setText(date.format(DateTimeFormatter.ofPattern("d")));
-
-            android.util.TypedValue tv = new android.util.TypedValue();
-            android.content.res.Resources.Theme theme = requireContext().getTheme();
-
-            // Today is the ONLY blue cell. The selected day is shown purely by the
-            // compass-enlarge, so it gets no distinct background colour.
-            if (date.equals(today)) {
-                theme.resolveAttribute(R.attr.calToday, tv, true);
-            } else if (isRest) {
-                theme.resolveAttribute(R.attr.calRest, tv, true);
-            } else if (hasWork) {
-                theme.resolveAttribute(R.attr.calWorkout, tv, true);
-            } else {
-                theme.resolveAttribute(R.attr.calEmpty, tv, true);
-            }
-            h.box.setBackgroundColor(tv.data);
-
-            if (isPast && hasWork) {
-                h.dot.setBackgroundColor(repo.isDateComplete(date)
-                        ? getColor(R.color.accent) : getColor(R.color.danger));
-                h.dot.setVisibility(View.VISIBLE);
-            } else if (isRest || hasWork) {
-                h.dot.setBackgroundColor(isRest ? getColor(R.color.accent) : getColor(R.color.accent_2));
-                h.dot.setVisibility(View.VISIBLE);
-            } else {
-                h.dot.setVisibility(View.INVISIBLE);
-            }
-
-            float alpha = isPast ? 0.55f : 1.0f;
-            h.dayLbl.setAlpha(alpha);
-            h.numLbl.setAlpha(alpha);
-
-            h.itemView.setOnClickListener(x -> {
-                if (date.isBefore(LocalDate.now()) && editMode) {
-                    editMode = false;
-                    editBtn.setText("Edit");
-                    editBtn.setBackgroundResource(R.drawable.btn_primary);
-                }
-                // Smooth scroll so the tapped cell glides to the centre;
-                // selection is finalised when the scroll settles (IDLE handler)
-                int offset = dateStripRv.getWidth() / 2 - dpToPx(28);
-                int dx = h.itemView.getLeft() - offset;
-                if (dx != 0) {
-                    dateStripRv.smoothScrollBy(dx, 0);
-                } else {
-                    selectedDate = date;
-                    notifyDataSetChanged();
-                    refreshExercises();
-                }
-            });
-        }
-
-        @Override public int getItemCount() { return end - start + 1; }
-
-        class DVH extends RecyclerView.ViewHolder {
-            TextView dayLbl, numLbl;
-            View dot, box;
-            DVH(View v) {
-                super(v);
-                dayLbl = v.findViewById(R.id.day_label);
-                numLbl = v.findViewById(R.id.num_label);
-                dot    = v.findViewById(R.id.status_dot);
-                box    = v.findViewById(R.id.cell_box);
-            }
-        }
-    }
-
-    // ── Streak ───────────────────────────────────────────────────────────────
-
-    private void updateStreak() {
-        LocalDate today = LocalDate.now();
-        int streak = repo.computeStreak();
-        int potentialStreak = streak > 0 ? 0 : repo.computePotentialStreak();
-
-        if (streak > 0) {
-            streakText.setText("🔥 " + streak + " day streak");
-        } else if (repo.isRestDay(today)) {
-            streakText.setText("🛌 Rest day — streak protected");
+        TextView num = new TextView(requireContext());
+        num.setText(String.valueOf(d.getDayOfMonth()));
+        num.setGravity(Gravity.CENTER);
+        num.setTextSize(15);
+        LinearLayout.LayoutParams np = new LinearLayout.LayoutParams(dp(34), dp(34));
+        np.topMargin = dp(4);
+        np.gravity = Gravity.CENTER_HORIZONTAL;
+        num.setLayoutParams(np);
+        if (d.equals(selectedDate)) {
+            num.setBackgroundResource(R.drawable.sel_day_bg);
+            num.setTextColor(getColor(R.color.on_accent));
+            num.setTypeface(null, Typeface.BOLD);
         } else {
-            if (potentialStreak > 0) {
-                streakText.setText("🔥 " + potentialStreak + " day streak — complete today to extend!");
-            } else {
-                List<ExerciseData> planned = repo.getExercisesForDate(today);
-                if (planned.isEmpty()) {
-                    streakText.setText("No exercises today");
-                } else {
-                    streakText.setText("Complete today to start a streak");
-                }
-            }
+            num.setTextColor(d.equals(today) ? getColor(R.color.accent) : themeColor(R.attr.colorTextPrimary));
+            if (d.equals(today)) num.setTypeface(null, Typeface.BOLD);
+            if (d.isBefore(today)) num.setAlpha(0.55f);
         }
+        cell.addView(num);
 
-        streakBar.setMax(30);
-        int displayStreak = streak > 0 ? streak : potentialStreak;
-        streakBar.setProgress(Math.min(30, displayStreak));
-        int barColor;
-        if (displayStreak >= 90)      barColor = getColor(R.color.danger);
-        else if (displayStreak >= 30) barColor = getColor(R.color.accent_2);
-        else                          barColor = getColor(R.color.accent);
-        streakBar.setProgressTintList(android.content.res.ColorStateList.valueOf(barColor));
+        // Dot: done (mint) / missed (red) for past days, grey for planned days ahead
+        View dot = new View(requireContext());
+        LinearLayout.LayoutParams dotLp = new LinearLayout.LayoutParams(dp(5), dp(5));
+        dotLp.topMargin = dp(5);
+        dotLp.gravity = Gravity.CENTER_HORIZONTAL;
+        dot.setLayoutParams(dotLp);
+        boolean planned = !repo.getExercisesForDate(d).isEmpty() && !repo.isRestWeekday(d);
+        int dotColor = 0;
+        if (d.isBefore(today)) {
+            if (repo.isDateComplete(d) || !repo.completed.getOrDefault(d, Collections.emptyList()).isEmpty())
+                dotColor = getColor(R.color.accent);
+            else if (planned) dotColor = getColor(R.color.danger);
+        } else if (planned) {
+            dotColor = themeColor(R.attr.colorTextMuted);
+        }
+        if (dotColor != 0) {
+            android.graphics.drawable.GradientDrawable g = new android.graphics.drawable.GradientDrawable();
+            g.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+            g.setColor(dotColor);
+            dot.setBackground(g);
+        }
+        cell.addView(dot);
+        return cell;
+    }
+
+    // ── Headline card ────────────────────────────────────────────────────────
+
+    private void updateHero(List<ExerciseData> shown, boolean isPast, boolean isRest) {
+        String date = selectedDate.format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH))
+                .toUpperCase(Locale.ROOT);
+        dateLabel.setText(selectedDate.equals(today) ? date : date + "  ·  TAP FOR TODAY");
+
+        heroTitle.setText(dayTitle(shown, isPast, isRest));
+        List<ExerciseData> done = repo.completed.getOrDefault(selectedDate, Collections.emptyList());
+        int planned = shown.size(), doneCount = 0;
+        for (ExerciseData ex : shown) if (done.contains(ex)) doneCount++;
+
+        String sub;
+        if (planned == 0) {
+            sub = isRest ? "Recovery is part of the plan"
+                    : isPast ? "Nothing was logged this day" : "Nothing planned — tap + to add";
+        } else if (isPast) {
+            sub = doneCount + " exercise" + (doneCount == 1 ? "" : "s") + " logged";
+        } else {
+            sub = doneCount + " of " + planned + " done";
+            if (selectedDate.equals(today)) sub += "  ·  " + streakLine();
+        }
+        heroSub.setText(sub);
+        heroBar.setVisibility(planned == 0 || isPast ? View.GONE : View.VISIBLE);
+        heroBar.setMax(Math.max(1, planned));
+        heroBar.setProgress(doneCount);
+    }
+
+    private String streakLine() {
+        int streak = repo.computeStreak();
+        if (streak > 0) return "🔥 " + streak + " day streak";
+        int potential = repo.computePotentialStreak();
+        return potential > 0 ? "finish to make it " + (potential + 1) + " days" : "finish to start a streak";
+    }
+
+    /** "Leg day", "Push day"… when one muscle group is most of the plan, else "Full body". */
+    private String dayTitle(List<ExerciseData> shown, boolean isPast, boolean isRest) {
+        if (shown.isEmpty()) return isRest ? "Rest day" : isPast ? "No workout" : "Free day";
+        Map<String, Integer> count = new HashMap<>();
+        for (ExerciseData ex : shown) count.merge(repo.classifyExercise(ex.getName()), 1, Integer::sum);
+        String top = null; int best = 0;
+        for (Map.Entry<String, Integer> e : count.entrySet())
+            if (e.getValue() > best) { best = e.getValue(); top = e.getKey(); }
+        if (best * 2 <= shown.size() || top == null) return "Full body";
+        switch (top) {
+            case "Legs": return "Leg day";
+            case "Push": return "Push day";
+            case "Pull": return "Pull day";
+            case "Arms": return "Arm day";
+            case "Core": return "Core day";
+            default:     return "Workout";
+        }
+    }
+
+    // ── ⋮ menu ───────────────────────────────────────────────────────────────
+
+    private void showMenu() {
+        boolean isPast = selectedDate.isBefore(today);
+        PopupMenu m = new PopupMenu(requireContext(), menuBtn);
+        if (isPast) {
+            m.getMenu().add(0, 4, 0, "Back to today");
+        } else {
+            m.getMenu().add(0, 1, 0, "Templates…");
+            m.getMenu().add(0, 2, 1, repo.restDays.contains(selectedDate.getDayOfWeek())
+                    ? "Remove rest day" : "Make " + selectedDate.getDayOfWeek()
+                        .getDisplayName(TextStyle.FULL, Locale.ENGLISH) + "s rest days");
+            if (adapter.getItemCount() > 1)
+                m.getMenu().add(0, 3, 2, reorderMode ? "Done reordering" : "Reorder exercises");
+        }
+        m.setOnMenuItemClickListener(item -> {
+            switch (item.getItemId()) {
+                case 1: showTemplateDialog(); break;
+                case 2: {
+                    DayOfWeek dow = selectedDate.getDayOfWeek();
+                    if (!repo.restDays.remove(dow)) repo.restDays.add(dow);
+                    repo.saveAsync();
+                    refreshExercises();
+                    break;
+                }
+                case 3: reorderMode = !reorderMode; refreshExercises(); break;
+                case 4: select(today); break;
+            }
+            return true;
+        });
+        m.show();
     }
 
     // ── Exercise list ─────────────────────────────────────────────────────────
 
     private void refreshExercises() {
-        boolean isRest   = repo.isRestDay(selectedDate);
-        boolean isPast   = selectedDate.isBefore(LocalDate.now());
+        boolean isRest = repo.isRestDay(selectedDate);
+        boolean isPast = selectedDate.isBefore(today);
         // Past days are an immutable record of what was actually logged that day —
         // render them from the saved completion snapshot, not the recurring schedule.
         List<ExerciseData> exercises = isPast
                 ? new ArrayList<>(repo.completed.getOrDefault(selectedDate, Collections.emptyList()))
                 : repo.getExercisesForDate(selectedDate);
+        if (exercises.size() < 2) reorderMode = false;
         adapter.setExercises(exercises);
 
-        FloatingActionButton fab = getView() == null ? null :
-                getView().findViewById(R.id.fab_add);
-        if (fab != null) fab.setVisibility(isPast ? View.GONE : View.VISIBLE);
-        if (editBtn != null) editBtn.setVisibility(isPast ? View.GONE : View.VISIBLE);
-        if (restDayBtn != null) restDayBtn.setVisibility(isPast ? View.GONE : View.VISIBLE);
-        View templateBtn = getView() == null ? null : getView().findViewById(R.id.btn_template);
-        if (templateBtn != null) templateBtn.setVisibility(isPast ? View.GONE : View.VISIBLE);
-
+        fab.setVisibility(isPast ? View.GONE : View.VISIBLE);
+        exerciseRecycler.setVisibility(exercises.isEmpty() ? View.GONE : View.VISIBLE);
+        emptyText.setVisibility(exercises.isEmpty() ? View.VISIBLE : View.GONE);
         if (exercises.isEmpty()) {
-            exerciseRecycler.setVisibility(View.GONE);
-            emptyState.setVisibility(View.VISIBLE);
-            if (isPast) {
-                emptyText.setText("No exercises were completed this day");
-            } else if (isRest) {
-                emptyText.setText("Rest day — recovery is part of the plan!");
-                if (restDayBtn != null) restDayBtn.setText("Remove Rest Day");
-            } else {
-                emptyText.setText("No exercises yet — tap + to add or use a Template");
-                if (restDayBtn != null) restDayBtn.setText("Mark as Rest Day");
-            }
-        } else {
-            exerciseRecycler.setVisibility(View.VISIBLE);
-            emptyState.setVisibility(View.GONE);
+            emptyText.setText(isPast ? "Swipe the week or tap a day to look back."
+                    : isRest ? "Rest day. Change it under ⋮ if you want to train."
+                    : "Tap + to add an exercise,\nor load a template from ⋮");
         }
         refreshDateStrip();
-        updateStreak();
+        updateHero(exercises, isPast, isRest);
     }
 
     private int getColor(int resId) {
         return requireContext().getResources().getColor(resId, requireContext().getTheme());
     }
 
+    private int themeColor(int attr) {
+        android.util.TypedValue tv = new android.util.TypedValue();
+        requireContext().getTheme().resolveAttribute(attr, tv, true);
+        return tv.data;
+    }
+
+    private int dp(int v) { return Math.round(v * getResources().getDisplayMetrics().density); }
+
+    private static String restLabel(int s) {
+        if (s < 120) return s + " s";
+        return s % 60 == 0 ? (s / 60) + " min" : (s / 60) + " min " + (s % 60) + " s";
+    }
+
     // ── RecyclerView Adapter ──────────────────────────────────────────────────
 
     private class ExerciseAdapter extends RecyclerView.Adapter<ExerciseAdapter.VH> {
-        private List<ExerciseData> items = new ArrayList<>();
+        List<ExerciseData> items = new ArrayList<>();
 
         void setExercises(List<ExerciseData> list) {
             items = new ArrayList<>(list);
@@ -451,81 +346,74 @@ public class WorkoutFragment extends Fragment {
         public void onBindViewHolder(@NonNull VH h, int pos) {
             ExerciseData ex = items.get(pos);
             h.name.setText(ex.getName());
-            String w = ex.isBodyweight() ? "BW" : Units.fmt(ex.getWeightKg());
-            h.stats.setText(w + "  |  " + ex.getReps() + "  |  " + ex.getRestSeconds() + "s rest");
+            String w = ex.isBodyweight() ? "Bodyweight" : Units.fmt(ex.getWeightKg());
+            h.stats.setText(w + "  ·  " + ex.getSets() + "×" + ex.getRepsPerSet()
+                    + "  ·  " + restLabel(ex.getRestSeconds()) + " rest");
 
-            // Muscle group pill
-            String group = repo.classifyExercise(ex.getName());
-            h.pill.setText(group);
-            int pillColor;
-            switch (group) {
-                case "Push": pillColor = getColor(R.color.pill_push); break;
-                case "Pull": pillColor = getColor(R.color.pill_pull); break;
-                case "Legs": pillColor = getColor(R.color.pill_legs); break;
-                case "Arms": pillColor = getColor(R.color.pill_arms); break;
-                case "Core": pillColor = getColor(R.color.pill_core); break;
-                default:     pillColor = getColor(R.color.pill_other); break;
+            int stripColor;
+            switch (repo.classifyExercise(ex.getName())) {
+                case "Push": stripColor = getColor(R.color.pill_push); break;
+                case "Pull": stripColor = getColor(R.color.pill_pull); break;
+                case "Legs": stripColor = getColor(R.color.pill_legs); break;
+                case "Arms": stripColor = getColor(R.color.pill_arms); break;
+                case "Core": stripColor = getColor(R.color.pill_core); break;
+                default:     stripColor = getColor(R.color.pill_other); break;
             }
-            h.pill.setChipBackgroundColor(
-                    android.content.res.ColorStateList.valueOf(pillColor));
+            h.strip.setBackgroundColor(stripColor);
 
-            // Completion state
-            List<ExerciseData> done = repo.completed.getOrDefault(
-                    selectedDate, Collections.emptyList());
+            // Completion state — only today can be ticked (past days are a record)
+            List<ExerciseData> done = repo.completed.getOrDefault(selectedDate, Collections.emptyList());
+            boolean isToday = selectedDate.equals(today);
             h.check.setOnCheckedChangeListener(null);
             h.check.setChecked(done.contains(ex));
-            boolean isToday = selectedDate.equals(LocalDate.now());
-            h.check.setEnabled(isToday); // past days are read-only for streak integrity
-            h.check.setAlpha(isToday ? 1.0f : 0.6f);
+            h.check.setEnabled(isToday);
+            h.check.setVisibility(isToday || done.contains(ex) ? View.VISIBLE : View.INVISIBLE);
             h.check.setOnCheckedChangeListener((b, checked) -> {
                 if (!selectedDate.equals(LocalDate.now())) return; // double-guard
                 repo.markComplete(selectedDate, ex, checked); // saves internally
                 if (checked) toastNewAchievements();
                 refreshDateStrip();
-                updateStreak();
+                updateHero(items, false, repo.isRestDay(selectedDate));
             });
 
-            // Edit mode
-            if (editMode) {
-                h.editButtons.setVisibility(View.VISIBLE);
-                h.delBtn.setBackgroundResource(R.drawable.btn_danger);
-                h.delBtn.setBackgroundTintList(null);
-                h.editBtn.setOnClickListener(v -> showEditDialog(ex));
-                // Wire drag handle
-                if (h.dragHandle != null) {
-                    h.dragHandle.setOnTouchListener((v, event) -> {
-                        if (event.getActionMasked() == android.view.MotionEvent.ACTION_DOWN) {
-                            touchHelper.startDrag(h);
-                        }
-                        return false;
-                    });
-                }
-                h.delBtn.setOnClickListener(v ->
-                    new AlertDialog.Builder(requireContext())
-                        .setTitle("Delete")
-                        .setMessage("Remove \"" + ex.getName() + "\" from every "
-                                + ex.daysLabel() + "?")
+            h.handle.setVisibility(reorderMode ? View.VISIBLE : View.GONE);
+            if (reorderMode) {
+                h.handle.setOnTouchListener((v, event) -> {
+                    if (event.getActionMasked() == MotionEvent.ACTION_DOWN) touchHelper.startDrag(h);
+                    return false;
+                });
+                h.itemView.setOnClickListener(null);
+                h.itemView.setOnLongClickListener(null);
+                return;
+            }
+            h.itemView.setOnClickListener(v -> {
+                Intent i = new Intent(getContext(), ExerciseDetailActivity.class);
+                i.putExtra("exercise_id", ex.getId());
+                i.putExtra("exercise_name", ex.getName());
+                i.putExtra("date", selectedDate.toString());
+                startActivity(i);
+            });
+            if (selectedDate.isBefore(today)) { h.itemView.setOnLongClickListener(null); return; }
+            h.itemView.setOnLongClickListener(v -> {
+                PopupMenu m = new PopupMenu(requireContext(), h.name);
+                m.getMenu().add(0, 1, 0, "Edit");
+                m.getMenu().add(0, 2, 1, "Delete");
+                m.setOnMenuItemClickListener(item -> {
+                    if (item.getItemId() == 1) showEditDialog(ex);
+                    else new AlertDialog.Builder(requireContext())
+                        .setTitle("Delete " + ex.getName() + "?")
+                        .setMessage("It will be removed from every " + ex.daysLabel() + ".")
                         .setPositiveButton("Delete", (d, ww) -> {
                             repo.exercises.remove(ex);
                             repo.saveAsync();
-                            if (repo.getExercisesForDate(selectedDate).isEmpty()) {
-                                editMode = false; editBtn.setText("Edit");
-                                editBtn.setBackgroundResource(R.drawable.btn_primary);
-                            }
                             refreshExercises();
                         })
-                        .setNegativeButton("Cancel", null).show());
-                h.itemView.setOnClickListener(null);
-            } else {
-                h.editButtons.setVisibility(View.GONE);
-                h.itemView.setOnClickListener(v -> {
-                    Intent i = new Intent(getContext(), ExerciseDetailActivity.class);
-                    i.putExtra("exercise_id", ex.getId());
-                    i.putExtra("exercise_name", ex.getName());
-                    i.putExtra("date", selectedDate.toString());
-                    startActivity(i);
+                        .setNegativeButton("Cancel", null).show();
+                    return true;
                 });
-            }
+                m.show();
+                return true;
+            });
         }
 
         @Override public int getItemCount() { return items.size(); }
@@ -533,20 +421,15 @@ public class WorkoutFragment extends Fragment {
         class VH extends RecyclerView.ViewHolder {
             TextView name, stats;
             CheckBox check;
-            Chip pill;
-            LinearLayout editButtons;
-            Button editBtn, delBtn;
-            android.widget.TextView dragHandle;
+            View strip;
+            ImageView handle;
             VH(View v) {
                 super(v);
-                name       = v.findViewById(R.id.exercise_name);
-                stats      = v.findViewById(R.id.exercise_stats);
-                check      = v.findViewById(R.id.check_complete);
-                pill       = v.findViewById(R.id.muscle_pill);
-                editButtons = v.findViewById(R.id.edit_buttons);
-                editBtn    = v.findViewById(R.id.btn_edit_exercise);
-                delBtn     = v.findViewById(R.id.btn_delete_exercise);
-                dragHandle = v.findViewById(R.id.drag_handle);
+                name   = v.findViewById(R.id.exercise_name);
+                stats  = v.findViewById(R.id.exercise_stats);
+                check  = v.findViewById(R.id.check_complete);
+                strip  = v.findViewById(R.id.muscle_strip);
+                handle = v.findViewById(R.id.drag_handle);
             }
         }
     }

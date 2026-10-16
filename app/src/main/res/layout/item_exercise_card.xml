@@ -1,113 +1,72 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.cardview.widget.CardView
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- One exercise on Today: muscle-colour strip, name + plan, tick ring. Thin divider, no box. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/card_root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="8dp"
-    android:layout_marginStart="0dp"
-    android:layout_marginEnd="0dp"
-    android:foreground="?attr/selectableItemBackground"
-    app:cardBackgroundColor="?attr/colorCardBg"
-    app:cardCornerRadius="12dp"
-    app:cardElevation="3dp">
+    android:orientation="vertical"
+    android:background="?attr/selectableItemBackground">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="14dp">
+        android:minHeight="64dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingTop="10dp"
+        android:paddingBottom="10dp">
+
+        <ImageView
+            android:id="@+id/drag_handle"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:layout_marginEnd="10dp"
+            android:contentDescription="Drag to reorder"
+            android:src="@drawable/ic_drag"
+            app:tint="?attr/colorTextMuted"
+            android:visibility="gone"/>
+
+        <View
+            android:id="@+id/muscle_strip"
+            android:layout_width="3dp"
+            android:layout_height="36dp"
+            android:layout_marginEnd="14dp"
+            android:background="@color/pill_legs"/>
 
         <LinearLayout
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-
-            <CheckBox
-                android:id="@+id/check_complete"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:buttonTint="@color/accent"/>
-
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical"
-                android:layout_marginStart="10dp">
-
-                <TextView
-                    android:id="@+id/exercise_name"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textColor="?attr/colorTextPrimary"
-                    android:textSize="15sp"
-                    android:textStyle="bold"/>
-
-                <TextView
-                    android:id="@+id/exercise_stats"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textColor="?attr/colorTextMuted"
-                    android:textSize="12sp"
-                    android:layout_marginTop="2dp"/>
-
-            </LinearLayout>
-
-            <com.google.android.material.chip.Chip
-                android:id="@+id/muscle_pill"
-                android:layout_width="wrap_content"
-                android:layout_height="26dp"
-                android:textSize="10sp"
-                android:textColor="@color/white"
-                app:chipStrokeWidth="0dp"/>
-
-        </LinearLayout>
-
-        <!-- Edit mode buttons -->
-        <LinearLayout
-            android:id="@+id/edit_buttons"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginTop="8dp"
-            android:visibility="gone">
-
+            android:layout_weight="1"
+            android:orientation="vertical">
             <TextView
-                android:id="@+id/drag_handle"
+                android:id="@+id/exercise_name"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="≡"
-                android:textSize="18sp"
+                android:textColor="?attr/colorTextPrimary"
+                android:textSize="16sp"
+                android:textStyle="bold"/>
+            <TextView
+                android:id="@+id/exercise_stats"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
                 android:textColor="?attr/colorTextMuted"
-                android:paddingEnd="10dp"
-                android:gravity="center_vertical"/>
-
-            <Button
-                android:id="@+id/btn_edit_exercise"
-                android:text="Edit"
-                android:textSize="11sp"
-                android:textColor="@color/white"
-                android:layout_width="wrap_content"
-                android:layout_height="32dp"
-                android:layout_marginEnd="6dp"
-                android:background="@drawable/btn_primary"
-                android:backgroundTint="@null"/>
-
-            <Button
-                android:id="@+id/btn_delete_exercise"
-                android:text="Delete"
-                android:textSize="11sp"
-                android:textColor="@color/white"
-                android:layout_width="wrap_content"
-                android:layout_height="32dp"
-                android:background="@drawable/btn_danger"
-                android:backgroundTint="@null"/>
-
+                android:textSize="13sp"/>
         </LinearLayout>
 
+        <CheckBox
+            android:id="@+id/check_complete"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:button="@null"
+            android:background="@drawable/ring_check"
+            android:contentDescription="Mark done"/>
     </LinearLayout>
-</androidx.cardview.widget.CardView>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:alpha="0.5"
+        android:background="?attr/colorBorder"/>
+</LinearLayout>

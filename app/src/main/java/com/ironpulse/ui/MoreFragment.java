@@ -12,14 +12,17 @@ import java.time.LocalDate;
 import java.util.*;
 
 /**
- * Host for the four "More" tabs (PRs / Macros / Assessment / Settings). Each
- * tab builds its own UI in its own class; this fragment owns tab switching,
- * the shared view helpers, the FAB, and backup import/export plumbing.
+ * Hosts ONE of the page classes (PRs / Food / Programme check / Awards /
+ * Settings), picked by argument. Each page builds its own UI in its own class;
+ * this fragment owns the title, the shared view helpers, the FAB, and backup
+ * import/export plumbing.
  */
 public class MoreFragment extends Fragment {
+    static final int PRS = 0, FOOD = 1, CHECK = 2, AWARDS = 3, SETTINGS = 4;
+    private static final String[] TITLES = {"PRs", "Food", "Programme check", "Awards", "Settings"};
+
     AppRepository repo;
-    private static int tab = 0; // static: survives recreate (e.g. theme toggle)
-    private TextView[] tabs;
+    private int tab;
     private LinearLayout contentRef;
     private FloatingActionButton prFab;
 
@@ -39,9 +42,18 @@ public class MoreFragment extends Fragment {
         registerForActivityResult(new androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
             granted -> {});
 
+    static MoreFragment page(int which) {
+        MoreFragment f = new MoreFragment();
+        Bundle b = new Bundle();
+        b.putInt("page", which);
+        f.setArguments(b);
+        return f;
+    }
+
     @Nullable @Override
     public View onCreateView(@NonNull LayoutInflater inf, @Nullable ViewGroup p, @Nullable Bundle s) {
         repo = AppRepository.get(requireContext());
+        tab = getArguments() == null ? PRS : getArguments().getInt("page", PRS);
         prsTab        = new PRsTab(this);
         macrosTab     = new MacrosTab(this);
         assessmentTab = new AssessmentTab(this);
@@ -53,49 +65,14 @@ public class MoreFragment extends Fragment {
         contentRef = content;
         prFab = root.findViewById(R.id.fab_add_pr);
         prFab.setOnClickListener(x -> prsTab.showAddPR());
-        tabs = new TextView[]{
-            root.findViewById(R.id.tab_prs),
-            root.findViewById(R.id.tab_macros),
-            root.findViewById(R.id.tab_assessment),
-            root.findViewById(R.id.tab_awards),
-            root.findViewById(R.id.tab_settings)
-        };
-        for (int i = 0; i < tabs.length; i++) {
-            final int idx = i;
-            tabs[i].setOnClickListener(x -> {
-                tab = idx;
-                prsTab.resetEditMode();
-                macrosTab.resetEditMode();
-                updateTabUI();
-                buildContent(content);
-            });
-        }
-        updateTabUI();
+        ((TextView) root.findViewById(R.id.page_title)).setText(TITLES[tab]);
         buildContent(content);
         return root;
     }
 
-    /** The floating + only makes sense on the PRs tab. */
+    /** The floating + only makes sense on the PRs page. */
     private void updateFab() {
-        if (prFab != null) prFab.setVisibility(tab == 0 ? View.VISIBLE : View.GONE);
-    }
-
-    private void updateTabUI() {
-        if (tabs == null) return;
-        int accent = color(R.color.accent), muted = themeColor(R.attr.colorTextMuted);
-        for (int i = 0; i < tabs.length; i++) {
-            if (i == tab) {
-                tabs[i].setTextColor(accent);
-                tabs[i].setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13);
-                tabs[i].setTypeface(null, android.graphics.Typeface.BOLD);
-                tabs[i].setBackgroundResource(R.drawable.tab_selected_bg);
-            } else {
-                tabs[i].setTextColor(muted);
-                tabs[i].setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
-                tabs[i].setTypeface(null, android.graphics.Typeface.NORMAL);
-                tabs[i].setBackground(null);
-            }
-        }
+        if (prFab != null) prFab.setVisibility(tab == PRS ? View.VISIBLE : View.GONE);
     }
 
     private void buildContent(LinearLayout c) {
@@ -217,7 +194,8 @@ public class MoreFragment extends Fragment {
     void hdr(LinearLayout c, String t) {
         TextView tv = new TextView(requireContext()); tv.setText(t);
         tv.setTextColor(themeColor(R.attr.colorTextMuted)); tv.setTextSize(11);
-        tv.setPadding(0, 0, 0, 6); c.addView(tv);
+        tv.setLetterSpacing(0.08f);
+        tv.setPadding(dp(2), 0, 0, dp(8)); c.addView(tv);
     }
 
     TextView tv(String text) {
@@ -235,18 +213,18 @@ public class MoreFragment extends Fragment {
 
     void sp(LinearLayout c, int dp) {
         View v = new View(requireContext());
-        v.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp));
+        v.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(dp)));
         c.addView(v);
     }
 
     Button btn(LinearLayout c, String t, int col) {
         Button b = new Button(requireContext()); b.setText(t);
-        if (col == color(R.color.danger)) b.setBackgroundResource(R.drawable.btn_danger);
-        else                              b.setBackgroundResource(R.drawable.btn_primary);
-        b.setTextColor(color(R.color.white));
+        if (col == color(R.color.danger)) ButtonStyles.delete(b);
+        else                              ButtonStyles.log(b);
+        b.setPadding(b.getPaddingLeft(), dp(13), b.getPaddingRight(), dp(13));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(0, 0, 0, 8); b.setLayoutParams(lp);
+        lp.setMargins(0, 0, 0, dp(8)); b.setLayoutParams(lp);
         c.addView(b); return b;
     }
 
@@ -254,11 +232,13 @@ public class MoreFragment extends Fragment {
     LinearLayout row() {
         LinearLayout r = new LinearLayout(requireContext());
         r.setOrientation(LinearLayout.HORIZONTAL);
-        r.setBackgroundColor(themeColor(R.attr.colorCardBg));
-        r.setPadding(20, 14, 20, 14);
+        r.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        r.setBackgroundResource(R.drawable.tile_bg);
+        r.setPadding(dp(16), dp(14), dp(16), dp(14));
+        r.setMinimumHeight(dp(52));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(0, 0, 0, 6); r.setLayoutParams(lp);
+        lp.setMargins(0, 0, 0, dp(6)); r.setLayoutParams(lp);
         return r;
     }
 

@@ -37,7 +37,7 @@ com.ironpulse
              Achievements, Units, LocalDate/DayOfWeek type adapters
   model/     ExerciseData, SetLog, BodyWeightEntry, CardioEntry, RecordData, Food
   notify/    reminders, rest timer, quick-log action, boot receiver
-  ui/        MainActivity + 5 fragments, 4 custom Canvas views, More-screen tabs
+  ui/        MainActivity + custom bottom bar, feature pages, 4 custom Canvas views
   widget/    WorkoutWidgetProvider
 ```
 
@@ -46,9 +46,14 @@ in memory, persisted to 12 JSON files through Gson on a single-thread executor.
 `LocalDate` and `DayOfWeek` need custom type adapters because Gson has no
 built-in support for `java.time`.
 
-The UI is a `MainActivity` with five bottom-nav fragments. `MoreFragment` is a
-slim host for four tab classes (`PRsTab`, `MacrosTab`, `AssessmentTab`,
-`SettingsTab`) — it was one 826-line fragment before that split.
+The UI is a `MainActivity` with its own scrollable bottom bar. `Features` lists
+every feature once; the user picks which sit on the bar (any number, in any
+order, saved in `prefs.json`) and the rest stay one tap away on the ••• page
+(`AllFeaturesFragment`), which also leads to Settings. Android's
+`BottomNavigationView` caps at five items, hence the custom bar. `MoreFragment`
+hosts one page class at a time (`PRsTab`, `MacrosTab`, `AssessmentTab`,
+`AwardsTab`, `SettingsTab`). Each screen has one filled action; rarer actions sit
+behind ⋮ or a long-press (`Dialogs.longPressEditDelete`).
 
 ## Key technical decisions
 

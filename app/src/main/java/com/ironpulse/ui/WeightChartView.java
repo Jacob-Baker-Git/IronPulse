@@ -18,8 +18,8 @@ import java.util.*;
  */
 public class WeightChartView extends View {
     private List<BodyWeightEntry> data = new ArrayList<>();
-    private int bgColor  = 0xFF181E2C;
-    private int textCol  = 0xFF72889E;
+    private int bgColor  = 0xFF151A22;
+    private int textCol  = 0xFF6B7686;
 
     public static final int VISIBLE_POINTS = 7;
     private static final float PAD_L = 88f, PAD_R = 20f;
@@ -57,12 +57,12 @@ public class WeightChartView extends View {
     public WeightChartView(Context ctx, AttributeSet a, int def) { super(ctx, a, def); init(); }
 
     private void init() {
-        linePaint.setColor(0xFF22C882); linePaint.setStrokeWidth(5f);
+        linePaint.setColor(0xFF3EE08F); linePaint.setStrokeWidth(5f);
         linePaint.setStyle(Paint.Style.STROKE); linePaint.setStrokeJoin(Paint.Join.ROUND);
         linePaint.setStrokeCap(Paint.Cap.ROUND);
         fillPaint.setStyle(Paint.Style.FILL);
-        dotPaint.setColor(0xFF22C882); dotPaint.setStyle(Paint.Style.FILL);
-        dotRing.setColor(0xFF181E2C); dotRing.setStyle(Paint.Style.FILL);
+        dotPaint.setColor(0xFF3EE08F); dotPaint.setStyle(Paint.Style.FILL);
+        dotRing.setColor(0xFF151A22); dotRing.setStyle(Paint.Style.FILL);
         labelPaint.setTextAlign(Paint.Align.CENTER); labelPaint.setTextSize(36f);
         axisPaint.setTextAlign(Paint.Align.RIGHT); axisPaint.setTextSize(32f);
         gridPaint.setStrokeWidth(1.5f);
@@ -180,7 +180,7 @@ public class WeightChartView extends View {
         if (fillShader == null || shaderTop != padT || shaderBot != padT + chartH) {
             shaderTop = padT; shaderBot = padT + chartH;
             fillShader = new LinearGradient(0, shaderTop, 0, shaderBot,
-                    0x4422C882, 0x0022C882, Shader.TileMode.CLAMP);
+                    0x443EE08F, 0x003EE08F, Shader.TileMode.CLAMP);
         }
         fillPaint.setShader(fillShader);
         canvas.drawPath(fillPath, fillPaint);
@@ -210,7 +210,7 @@ public class WeightChartView extends View {
         double diff = Units.toDisplay(data.get(lv).getWeightKg() - data.get(fv).getWeightKg());
         String trend = diff > 0.05 ? String.format(java.util.Locale.US, "▲ +%.1f %s", diff, Units.unit())
                      : diff < -0.05 ? String.format(java.util.Locale.US, "▼ %.1f %s", diff, Units.unit()) : "→ stable";
-        trendPaint.setColor(diff > 0.05 ? 0xFFE64444 : diff < -0.05 ? 0xFF22C882 : 0xFFFFB937);
+        trendPaint.setColor(diff > 0.05 ? 0xFFE5484D : diff < -0.05 ? 0xFF3EE08F : 0xFFFFB937);
         trendPaint.setTextAlign(Paint.Align.RIGHT);
         canvas.drawText(trend, w - padR, padT - 8, trendPaint);
 
@@ -225,7 +225,7 @@ public class WeightChartView extends View {
         bx1 = Math.max(padL, Math.min(bx1, w - padR));
         bx2 = Math.max(padL, Math.min(bx2, w - padR));
         if (bx2 - bx1 < 24f) bx2 = Math.min(w - padR, bx1 + 24f);
-        gridPaint.setColor(0xFF22C882);
+        gridPaint.setColor(0xFF3EE08F);
         canvas.drawRoundRect(r(bx1, trackY, bx2, trackY + trackH), trackH / 2, trackH / 2, gridPaint);
         gridPaint.setStyle(Paint.Style.STROKE);
     }

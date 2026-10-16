@@ -10,3 +10,6 @@
 *.jks
 keystore.properties
 local.properties
+
+# Brainstorm mockups (local only)
+.superpowers/

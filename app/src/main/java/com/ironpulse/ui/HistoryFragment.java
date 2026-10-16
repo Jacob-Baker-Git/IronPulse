@@ -20,7 +20,7 @@ public class HistoryFragment extends Fragment {
     private Spinner spinner;
     private HistoryChartView chartView;
     private MonthHeatmapView heatmap;
-    private TextView volBtn, e1rmBtn;
+    private TextView volBtn, e1rmBtn, chartEmpty;
     /** 0 = training volume, 1 = estimated 1RM (Epley) */
     private int metric = 0;
     private YearMonth heatmapMonth = YearMonth.now();
@@ -34,11 +34,18 @@ public class HistoryFragment extends Fragment {
         heatmap   = v.findViewById(R.id.month_heatmap);
         volBtn    = v.findViewById(R.id.metric_volume);
         e1rmBtn   = v.findViewById(R.id.metric_e1rm);
+        chartEmpty = v.findViewById(R.id.chart_empty);
         if (chartView != null) {
             android.util.TypedValue tv2 = new android.util.TypedValue();
             requireContext().getTheme().resolveAttribute(R.attr.colorCardBg, tv2, true);
             chartView.setBgColor(tv2.data);
             if (heatmap != null) heatmap.setBgColor(tv2.data);
+            // Rounded like the cards around them
+            for (View r : new View[]{chartView, heatmap}) {
+                if (r == null) continue;
+                r.setBackgroundResource(R.drawable.tile_bg);
+                r.setClipToOutline(true);
+            }
             requireContext().getTheme().resolveAttribute(R.attr.colorTextMuted, tv2, true);
             chartView.setTextColor(tv2.data);
             if (heatmap != null) heatmap.setTextColor(tv2.data);
@@ -92,7 +99,10 @@ public class HistoryFragment extends Fragment {
     private void buildChart() {
         if (spinner.getAdapter() == null || chartView == null) return;
         String rawName = spinner.getSelectedItem().toString();
-        if (rawName.equals("No completed exercises yet")) { chartView.setData(null, null); return; }
+        if (rawName.equals("No completed exercises yet")) {
+            showChart(null, null, "Tick off or log an exercise on Today and its progress shows up here.");
+            return;
+        }
         String name = rawName.endsWith(" (deleted)") ? rawName.substring(0, rawName.length() - 10) : rawName;
         LocalDate today = LocalDate.now();
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("d/MM");
@@ -128,7 +138,18 @@ public class HistoryFragment extends Fragment {
             labels.add(d.format(fmt));
             values.add(Units.toDisplay(val)); // shown in the display unit
         }
+        boolean any = false;
+        for (double val : values) if (val > 0) { any = true; break; }
+        showChart(values, labels, any ? null : "Nothing for " + name + " in the last 60 days.\n"
+                + (metric == 1 ? "Est. 1RM needs logged sets with a weight." : "Log sets to see your volume."));
+    }
+
+    /** The chart when there's data, a plain sentence instead of an empty chart when not. */
+    private void showChart(List<Double> values, List<String> labels, String emptyMessage) {
         chartView.setData(values, labels);
+        chartView.setVisibility(emptyMessage == null ? View.VISIBLE : View.GONE);
+        chartEmpty.setVisibility(emptyMessage == null ? View.GONE : View.VISIBLE);
+        if (emptyMessage != null) chartEmpty.setText(emptyMessage);
     }
 
     // ── Month heatmap ─────────────────────────────────────────────────────────

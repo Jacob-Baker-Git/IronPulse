@@ -37,6 +37,24 @@ final class Dialogs {
             .show();
     }
 
+    /**
+     * Replaces the old per-screen "Edit" mode: long-press any row for Edit / Delete.
+     * {@code onEdit} may be null for rows that can only be deleted.
+     */
+    static void longPressEditDelete(android.view.View row, Runnable onEdit, Runnable onDelete) {
+        row.setOnLongClickListener(v -> {
+            android.widget.PopupMenu m = new android.widget.PopupMenu(v.getContext(), v);
+            if (onEdit != null) m.getMenu().add(0, 1, 0, "Edit");
+            m.getMenu().add(0, 2, 1, "Delete");
+            m.setOnMenuItemClickListener(item -> {
+                if (item.getItemId() == 1) onEdit.run(); else onDelete.run();
+                return true;
+            });
+            m.show();
+            return true;
+        });
+    }
+
     /** Generic confirm with a custom message + positive label. */
     static void confirm(Context c, String title, String message, String positive, Runnable onYes) {
         new AlertDialog.Builder(c)

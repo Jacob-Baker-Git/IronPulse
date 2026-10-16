@@ -1,6 +1,5 @@
 package com.ironpulse.ui;
 
-import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import com.ironpulse.R;
@@ -14,14 +13,16 @@ class AssessmentTab {
     AssessmentTab(MoreFragment host) { this.host = host; }
 
     void build(LinearLayout c) {
-        host.hdr(c, "Split Assessment");
+        // Runs on open — it's cheap, and a button in front of it was one more step for nothing
+        host.hdr(c, "YOUR WEEKLY SPLIT, SCORED");
         TextView result = new TextView(host.requireContext());
-        result.setTextColor(host.themeColor(R.attr.colorTextMuted)); result.setTextSize(12);
+        result.setTextColor(host.themeColor(R.attr.colorTextPrimary)); result.setTextSize(13);
         result.setTypeface(android.graphics.Typeface.MONOSPACE);
-        result.setText("Tap Analyse to assess your weekly split.");
-        Button runBtn = host.btn(c, "Analyse My Programme", host.color(R.color.accent));
-        runBtn.setOnClickListener(x -> result.setText(runAssessment()));
-        host.sp(c, 12); c.addView(result);
+        result.setLineSpacing(0, 1.15f);
+        result.setBackgroundResource(R.drawable.tile_bg);
+        result.setPadding(host.dp(16), host.dp(16), host.dp(16), host.dp(16));
+        result.setText(runAssessment());
+        c.addView(result);
     }
 
     private String runAssessment() {

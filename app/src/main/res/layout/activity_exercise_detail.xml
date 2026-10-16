@@ -1,65 +1,159 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/detail_root"
-    android:layout_width="match_parent" android:layout_height="match_parent" android:padding="16dp">
-    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="20dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:orientation="vertical">
-        <Button android:id="@+id/btn_back" android:text="← Back"
-            android:layout_width="wrap_content" android:layout_height="36dp"
-            android:backgroundTint="@color/panel_mid" android:layout_marginBottom="12dp"/>
-        <TextView android:id="@+id/exercise_title"
-            android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:textColor="?attr/colorTextPrimary" android:textSize="24sp" android:textStyle="bold"
-            android:layout_gravity="center_horizontal" android:layout_marginBottom="6dp"/>
-        <TextView android:id="@+id/exercise_stats"
-            android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:textColor="?attr/colorTextMuted" android:textSize="13sp"
-            android:layout_gravity="center_horizontal" android:layout_marginBottom="4dp"/>
-        <TextView android:id="@+id/prev_best"
-            android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:textColor="@color/accent" android:textSize="12sp" android:textStyle="bold"
-            android:layout_gravity="center_horizontal" android:layout_marginBottom="16dp"/>
-        <TextView android:id="@+id/timer_label"
-            android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:text="Rest timer ready" android:textColor="@color/accent_2"
-            android:textSize="32sp" android:textStyle="bold"
-            android:layout_gravity="center_horizontal" android:layout_marginBottom="20dp"/>
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:orientation="horizontal" android:layout_marginBottom="12dp">
-            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
-                android:layout_weight="1" android:orientation="vertical" android:layout_marginEnd="8dp">
-                <TextView android:id="@+id/weight_field_label"
-                    android:text="Weight (kg or BW)" android:textColor="?attr/colorTextMuted"
-                    android:textSize="11sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
-                <EditText android:id="@+id/field_weight" android:layout_width="match_parent"
-                    android:layout_height="44dp" android:background="@drawable/field_bg"
-                    android:textColor="?attr/colorTextPrimary" android:padding="8dp"/>
+
+        <ImageButton
+            android:id="@+id/btn_back"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="-10dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Back"
+            android:src="@drawable/ic_back"
+            app:tint="?attr/colorTextPrimary"/>
+
+        <TextView
+            android:id="@+id/exercise_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:textAppearance="@style/TextAppearance.IronPulse.PageTitle"/>
+        <TextView
+            android:id="@+id/exercise_stats"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="?attr/colorTextMuted"
+            android:textSize="14sp"/>
+        <TextView
+            android:id="@+id/prev_best"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:textColor="@color/accent"
+            android:textSize="13sp"/>
+
+        <!-- Rest timer: amber while resting, mint when done, red when time's up -->
+        <TextView
+            android:id="@+id/timer_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="20dp"
+            android:background="@drawable/tile_bg"
+            android:gravity="center"
+            android:paddingTop="24dp"
+            android:paddingBottom="24dp"
+            android:text="Ready when you are"
+            android:textColor="?attr/colorTextMuted"
+            android:textSize="26sp"
+            android:textStyle="bold"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp"
+            android:orientation="horizontal">
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="10dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:id="@+id/weight_field_label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="4dp"
+                    android:text="Weight"
+                    android:textColor="?attr/colorTextMuted"
+                    android:textSize="12sp"/>
+                <EditText
+                    android:id="@+id/field_weight"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:background="@drawable/field_bg"
+                    android:gravity="center"
+                    android:textColor="?attr/colorTextPrimary"
+                    android:textSize="22sp"
+                    android:textStyle="bold"/>
             </LinearLayout>
-            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
-                android:layout_weight="1" android:orientation="vertical">
-                <TextView android:text="Reps" android:textColor="?attr/colorTextMuted"
-                    android:textSize="11sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
-                <EditText android:id="@+id/field_reps" android:layout_width="match_parent"
-                    android:layout_height="44dp" android:inputType="number"
-                    android:background="@drawable/field_bg" android:textColor="?attr/colorTextPrimary" android:padding="8dp"/>
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="4dp"
+                    android:text="Reps"
+                    android:textColor="?attr/colorTextMuted"
+                    android:textSize="12sp"/>
+                <EditText
+                    android:id="@+id/field_reps"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:background="@drawable/field_bg"
+                    android:gravity="center"
+                    android:inputType="number"
+                    android:textColor="?attr/colorTextPrimary"
+                    android:textSize="22sp"
+                    android:textStyle="bold"/>
             </LinearLayout>
         </LinearLayout>
-        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:orientation="horizontal" android:layout_marginBottom="8dp">
-            <Button android:id="@+id/btn_log_set" android:text="Log Set"
-                android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1"
-                android:layout_marginEnd="8dp" android:backgroundTint="@color/accent"/>
-            <Button android:id="@+id/btn_pause" android:text="Pause"
-                android:layout_width="0dp" android:layout_height="48dp" android:layout_weight="1"
-                android:backgroundTint="@color/panel_mid"/>
+
+        <Button
+            android:id="@+id/btn_log_set"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginBottom="10dp"
+            android:text="Log set"/>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            android:orientation="horizontal">
+            <Button
+                android:id="@+id/btn_pause"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_marginEnd="10dp"
+                android:layout_weight="1"
+                android:text="Pause"/>
+            <Button
+                android:id="@+id/btn_plates"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_weight="1"
+                android:text="Plate calculator"/>
         </LinearLayout>
-        <Button android:id="@+id/btn_plates" android:text="⚖  Plate Calculator"
-            android:layout_width="match_parent" android:layout_height="40dp"
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
-            android:textSize="12sp"
-            android:backgroundTint="@color/panel_mid"/>
-        <TextView android:id="@+id/set_history"
-            android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:textColor="?attr/colorTextMuted" android:textSize="12sp" android:layout_marginBottom="16dp"/>
+            android:letterSpacing="0.08"
+            android:text="SETS THIS SESSION"
+            android:textColor="?attr/colorTextMuted"
+            android:textSize="11sp"/>
+        <TextView
+            android:id="@+id/set_history"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:lineSpacingExtra="6dp"
+            android:textColor="?attr/colorTextPrimary"
+            android:textSize="15sp"/>
     </LinearLayout>
 </ScrollView>

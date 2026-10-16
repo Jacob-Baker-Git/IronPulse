@@ -51,6 +51,8 @@ public class AppRepository {
     public boolean reminderEnabled = false;
     public int reminderHour = 18;
     public int reminderMinute = 0;
+    /** Feature ids pinned to the bottom bar, in order. Any length, even empty (••• is always added). */
+    public final List<String> navBar = new ArrayList<>(Arrays.asList("today", "progress", "food"));
 
     private AppRepository(Context ctx) {
         this.context = ctx.getApplicationContext();
@@ -169,14 +171,17 @@ public class AppRepository {
         saveAsync();
     }
 
-    public String classifyExercise(String name) {
+    public static String classifyExercise(String name) {
         if (name==null) return "Other";
         String n=name.toLowerCase(java.util.Locale.ROOT);
-        if (n.contains("bench")||n.contains("press")||n.contains("chest")||n.contains("push")||n.contains("shoulder")) return "Push";
-        if (n.contains("row")||n.contains("pull")||n.contains("lat")||n.contains("deadlift")||n.contains("back")) return "Pull";
-        if (n.contains("squat")||n.contains("leg")||n.contains("calf")||n.contains("lunge")||n.contains("ham")||n.contains("glute")) return "Legs";
-        if (n.contains("curl")||n.contains("tricep")||n.contains("bicep")||n.contains("extension")) return "Arms";
-        if (n.contains("plank")||n.contains("crunch")||n.contains("abs")||n.contains("core")) return "Core";
+        // Order matters: the specific groups first, so "Leg Press" is Legs (not Push),
+        // "Back Squat" is Legs (not Pull) and "Hanging Leg Raise" is Core (not Legs).
+        if (n.contains("plank")||n.contains("crunch")||n.contains("abs")||n.contains("core")||n.contains("leg raise")||n.contains("sit-up")||n.contains("twist")) return "Core";
+        if (n.contains("squat")||n.contains("leg")||n.contains("calf")||n.contains("lunge")||n.contains("hamstring")||n.contains("glute")||n.contains("hip thrust")) return "Legs";
+        if (n.contains("tricep")||n.contains("bicep")||n.contains("skullcrusher")) return "Arms"; // before Push: "Tricep Pushdown"
+        if (n.contains("bench")||n.contains("press")||n.contains("chest")||n.contains("push")||n.contains("shoulder")||n.contains("dip")||n.contains("fly")||n.contains("lateral raise")) return "Push";
+        if (n.contains("row")||n.contains("pull")||n.contains("lat ")||n.contains("lats")||n.contains("chin")||n.contains("deadlift")||n.contains("back")||n.contains("shrug")) return "Pull";
+        if (n.contains("curl")||n.contains("tricep")||n.contains("bicep")||n.contains("extension")||n.contains("skullcrusher")) return "Arms";
         return "Other";
     }
 
@@ -231,6 +236,7 @@ public class AppRepository {
         prefsSnap.put("reminderEnabled", reminderEnabled);
         prefsSnap.put("reminderHour", reminderHour);
         prefsSnap.put("reminderMinute", reminderMinute);
+        prefsSnap.put("navBar", new ArrayList<>(navBar));
 
         ioExecutor.execute(() -> {
             saveJson("exercises.json", exSnap);
@@ -327,6 +333,8 @@ public class AppRepository {
             Object re=prefs.get("reminderEnabled"); if (re instanceof Boolean) reminderEnabled=(Boolean)re;
             Object rh=prefs.get("reminderHour"); if (rh instanceof Number) reminderHour=((Number)rh).intValue();
             Object rm=prefs.get("reminderMinute"); if (rm instanceof Number) reminderMinute=((Number)rm).intValue();
+            Object nb=prefs.get("navBar");
+            if (nb instanceof List) { navBar.clear(); for (Object o:(List<?>)nb) if (o instanceof String) navBar.add((String)o); }
             Object mg=prefs.get("macroGoals"); if (mg instanceof List) { List<?> l=(List<?>)mg; for (int i=0;i<Math.min(4,l.size());i++) macroGoals[i]=String.valueOf(l.get(i)); }
             Object ma=prefs.get("macroActual"); if (ma instanceof List) { List<?> l=(List<?>)ma; for (int i=0;i<Math.min(4,l.size());i++) macroActual[i]=String.valueOf(l.get(i)); }
         }

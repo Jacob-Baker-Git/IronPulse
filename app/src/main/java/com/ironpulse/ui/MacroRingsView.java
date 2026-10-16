@@ -11,12 +11,12 @@ import android.view.View;
 public class MacroRingsView extends View {
     private static final String[] LABELS = {"Calories", "Protein", "Carbs", "Fats"};
     private static final String[] UNITS  = {"kcal", "g", "g", "g"};
-    private final int[] ringColors = {0xFF22C882, 0xFF1E64C8, 0xFFC8A014, 0xFF963CC0};
-    private static final int OVER = 0xFFE64444;
+    private final int[] ringColors = {0xFF3EE08F, 0xFF1E64C8, 0xFFC8A014, 0xFF963CC0};
+    private static final int OVER = 0xFFE5484D;
 
     private final double[] consumed = new double[4];
     private final double[] goal = new double[4];
-    private int textCol = 0xFF72889E;
+    private int textCol = 0xFF6B7686;
     private int strongText = 0xFFF0F4F8;
 
     private final Paint trackPaint = new Paint(Paint.ANTI_ALIAS_FLAG);

@@ -23,6 +23,7 @@
         <item name="streakTrack">@color/panel_mid</item>
         <item name="colorFieldBg">@color/field_bg</item>
         <item name="colorBorder">@color/border</item>
+        <item name="android:popupMenuStyle">@style/IronPulse.Popup</item>
     </style>
 
     <!-- Light theme -->
@@ -48,5 +49,29 @@
         <item name="streakTrack">@color/streak_track_light</item>
         <item name="colorFieldBg">@color/field_bg_light</item>
         <item name="colorBorder">@color/border_light</item>
+        <item name="android:popupMenuStyle">@style/IronPulse.Popup</item>
+    </style>
+
+    <style name="IronPulse.Popup" parent="@android:style/Widget.Material.PopupMenu">
+        <item name="android:popupBackground">@drawable/popup_bg</item>
+        <item name="android:popupElevation">8dp</item>
+    </style>
+
+    <!-- The one small round + used on every screen -->
+    <style name="Widget.IronPulse.Fab" parent="Widget.MaterialComponents.FloatingActionButton">
+        <item name="fabCustomSize">44dp</item>
+        <item name="maxImageSize">20dp</item>
+        <item name="backgroundTint">?attr/colorTextPrimary</item>
+        <item name="tint">?attr/colorScreenBg</item>
+        <item name="elevation">4dp</item>
+        <item name="srcCompat">@drawable/ic_add</item>
+    </style>
+
+    <!-- Big page title used at the top of every screen -->
+    <style name="TextAppearance.IronPulse.PageTitle" parent="">
+        <item name="android:textSize">26sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">?attr/colorTextPrimary</item>
+        <item name="android:letterSpacing">-0.02</item>
     </style>
 </resources>

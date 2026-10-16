@@ -16,8 +16,6 @@ public class CardioFragment extends Fragment {
     private AppRepository repo;
     private LinearLayout entryList;
     private TextView weekDist, totalSessions, bestPace;
-    private Button editBtn;
-    private boolean editMode = false;
 
     private int themeColor(int attr) {
         android.util.TypedValue tv = new android.util.TypedValue();
@@ -33,18 +31,7 @@ public class CardioFragment extends Fragment {
         weekDist      = v.findViewById(R.id.stat_week_dist);
         totalSessions = v.findViewById(R.id.stat_total_sessions);
         bestPace      = v.findViewById(R.id.stat_best_pace);
-        editBtn       = v.findViewById(R.id.btn_cardio_edit);
-
-        Button addBtn = v.findViewById(R.id.btn_add_cardio);
-        ButtonStyles.log(addBtn);
-        addBtn.setOnClickListener(x -> showCardioDialog(null));
-        ButtonStyles.toggle(editBtn, false);
-        editBtn.setOnClickListener(x -> {
-            editMode = !editMode;
-            editBtn.setText(editMode ? "Done" : "Edit");
-            ButtonStyles.toggle(editBtn, editMode);
-            refresh();
-        });
+        v.findViewById(R.id.btn_add_cardio).setOnClickListener(x -> showCardioDialog(null));
 
         refresh();
         return v;
@@ -77,65 +64,48 @@ public class CardioFragment extends Fragment {
             return;
         }
 
-        int cardBg = themeColor(R.attr.colorCardBg);
         int textPrimary = themeColor(R.attr.colorTextPrimary);
         int textMuted = themeColor(R.attr.colorTextMuted);
+        float d = getResources().getDisplayMetrics().density;
+        java.time.format.DateTimeFormatter df =
+                java.time.format.DateTimeFormatter.ofPattern("EEE d MMM", java.util.Locale.ENGLISH);
 
         for (CardioEntry e : sorted) {
             LinearLayout card = new LinearLayout(requireContext());
             card.setOrientation(LinearLayout.VERTICAL);
-            card.setBackgroundColor(cardBg);
+            card.setBackgroundResource(R.drawable.tile_bg);
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            lp.setMargins(0, 0, 0, 10); card.setLayoutParams(lp);
-            card.setPadding(20, 16, 20, 16);
-
-            // Top row: type + date
-            LinearLayout top = new LinearLayout(requireContext());
-            top.setOrientation(LinearLayout.HORIZONTAL);
-            top.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            lp.setMargins(0, 0, 0, Math.round(8 * d)); card.setLayoutParams(lp);
+            card.setPadding(Math.round(16 * d), Math.round(14 * d), Math.round(16 * d), Math.round(14 * d));
 
             TextView td = new TextView(requireContext());
-            td.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-            td.setText(e.getType() + "  •  " + e.getDate());
-            td.setTextColor(textPrimary); td.setTextSize(14);
-            top.addView(td);
+            td.setText(e.getType() + "  ·  " + e.getDate().format(df));
+            td.setTextColor(textPrimary); td.setTextSize(15);
+            td.setTypeface(null, android.graphics.Typeface.BOLD);
 
-            if (editMode) {
-                Button eb = new Button(requireContext());
-                eb.setText("Edit"); ButtonStyles.edit(eb);
-                LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                ep.setMargins(0, 0, 6, 0); eb.setLayoutParams(ep);
-                eb.setOnClickListener(x -> showCardioDialog(e));
-
-                Button db = new Button(requireContext());
-                db.setText("Delete"); ButtonStyles.delete(db);
-                db.setOnClickListener(x -> Dialogs.confirmDelete(requireContext(),
-                        "this " + e.getType() + " session (" + e.getDate() + ")", () -> {
-                    repo.cardio.remove(e); repo.saveAsync();
-                    if (repo.cardio.isEmpty()) { editMode = false; editBtn.setText("Edit"); ButtonStyles.toggle(editBtn, false); }
-                    refresh();
-                }));
-                top.addView(eb); top.addView(db);
-            }
-
-            // Detail row
             String det;
             if (e.getDistanceKm() > 0 && e.getDurationMinutes() > 0)
-                det = String.format(java.util.Locale.US, "%.1f km  |  %d min  |  %.1f min/km",
+                det = String.format(java.util.Locale.US, "%.1f km  ·  %d min  ·  %.1f min/km",
                         e.getDistanceKm(), e.getDurationMinutes(), e.getPaceMinPerKm());
             else if (e.getDistanceKm() > 0)
                 det = String.format(java.util.Locale.US, "%.1f km", e.getDistanceKm());
             else
                 det = e.getDurationMinutes() + " min";
-            if (e.getNotes() != null && !e.getNotes().isEmpty()) det += "  |  " + e.getNotes();
+            if (e.getNotes() != null && !e.getNotes().isEmpty()) det += "  ·  " + e.getNotes();
 
             TextView dv = new TextView(requireContext());
-            dv.setText(det); dv.setTextColor(textMuted); dv.setTextSize(12);
-            dv.setPadding(0, 4, 0, 0);
+            dv.setText(det); dv.setTextColor(textMuted); dv.setTextSize(13);
+            dv.setPadding(0, Math.round(3 * d), 0, 0);
 
-            card.addView(top); card.addView(dv);
+            card.addView(td); card.addView(dv);
+            card.setOnClickListener(x -> showCardioDialog(e));
+            Dialogs.longPressEditDelete(card, () -> showCardioDialog(e), () ->
+                    Dialogs.confirmDelete(requireContext(),
+                            "this " + e.getType() + " session (" + e.getDate().format(df) + ")", () -> {
+                        repo.cardio.remove(e); repo.saveAsync();
+                        refresh();
+                    }));
             entryList.addView(card);
         }
     }

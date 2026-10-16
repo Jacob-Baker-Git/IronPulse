@@ -10,56 +10,20 @@ import com.ironpulse.data.Units;
 import com.ironpulse.model.RecordData;
 import java.util.Collections;
 
-/** "PRs" tab of the More screen: 1RM records with drag-reorder and edit mode. */
+/** PRs page: best lifts. Tap to update, long-press for reorder / delete. */
 class PRsTab {
     private final MoreFragment host;
     private boolean editMode = false;
-    private Button editBtn;
     private RecyclerView recycler;
     private PRAdapter adapter;
     private ItemTouchHelper touchHelper;
 
     PRsTab(MoreFragment host) { this.host = host; }
 
-    void resetEditMode() { editMode = false; }
-
     void build(LinearLayout c) {
-        // Top bar
-        LinearLayout topBar = new LinearLayout(host.requireContext());
-        topBar.setOrientation(LinearLayout.HORIZONTAL);
-        topBar.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams tbLp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        tbLp.setMargins(0, 0, 0, 12); topBar.setLayoutParams(tbLp);
-        TextView title = new TextView(host.requireContext());
-        title.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        title.setText("1RM / Personal Records"); title.setTextColor(host.themeColor(R.attr.colorTextMuted)); title.setTextSize(11);
-        topBar.addView(title);
-        // Adding a PR is done via the floating green + (matches the Workout screen).
-        editBtn = new Button(host.requireContext());
-        editBtn.setText(editMode ? "Done" : "Edit");
-        ButtonStyles.toggle(editBtn, editMode);
-        editBtn.setOnClickListener(x -> {
-            editMode = !editMode;
-            editBtn.setText(editMode ? "Done" : "Edit");
-            ButtonStyles.toggle(editBtn, editMode);
-            if (adapter != null) adapter.notifyDataSetChanged();
-        });
-        topBar.addView(editBtn); c.addView(topBar);
-
-        // Muscle group legend
-        LinearLayout legend = new LinearLayout(host.requireContext());
-        legend.setOrientation(LinearLayout.HORIZONTAL); legend.setPadding(0, 0, 0, 12);
-        String[][] groups = {{"Push","#D25A1E"},{"Pull","#1E64C8"},{"Legs","#1EA050"},{"Arms","#963CC0"},{"Core","#C8A014"}};
-        for (String[] g : groups) {
-            TextView pill = new TextView(host.requireContext());
-            pill.setText(g[0]); pill.setTextSize(9); pill.setTextColor(0xFFFFFFFF);
-            pill.setBackgroundColor(android.graphics.Color.parseColor(g[1]));
-            pill.setPadding(12, 4, 12, 4);
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            lp.setMargins(0, 0, 6, 0); pill.setLayoutParams(lp); legend.addView(pill);
-        }
-        c.addView(legend);
+        // Adding a PR is the floating +; tap a lift to update it, hold it for more.
+        host.hdr(c, editMode ? "DRAG ≡ TO REORDER  ·  hold a lift when done"
+                : "YOUR BEST LIFTS  ·  tap to update, hold for more");
 
         // RecyclerView for drag support
         recycler = new RecyclerView(host.requireContext());
@@ -94,7 +58,6 @@ class PRsTab {
         class VH extends RecyclerView.ViewHolder {
             android.widget.FrameLayout card;
             TextView handle, name, weight, muscleGroup;
-            Button editBtn, delBtn;
             VH(View v) {
                 super(v);
                 card        = (android.widget.FrameLayout) v;
@@ -102,8 +65,6 @@ class PRsTab {
                 name        = v.findViewWithTag("name");
                 weight      = v.findViewWithTag("weight");
                 muscleGroup = v.findViewWithTag("muscle");
-                editBtn     = v.findViewWithTag("editBtn");
-                delBtn      = v.findViewWithTag("delBtn");
             }
         }
 
@@ -112,10 +73,10 @@ class PRsTab {
             android.widget.FrameLayout card = new android.widget.FrameLayout(host.requireContext());
             LinearLayout.LayoutParams cardLp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            cardLp.setMargins(0, 0, 0, 8);
+            cardLp.setMargins(0, 0, 0, host.dp(8));
             card.setLayoutParams(cardLp);
-            card.setBackgroundResource(R.drawable.card_bg);
-            card.setPadding(16, 16, 16, 16);
+            card.setBackgroundResource(R.drawable.tile_bg);
+            card.setPadding(host.dp(16), host.dp(14), host.dp(16), host.dp(14));
 
             LinearLayout inner = new LinearLayout(host.requireContext());
             inner.setOrientation(LinearLayout.VERTICAL);
@@ -144,8 +105,7 @@ class PRsTab {
             topRow.addView(nm);
 
             TextView muscle = new TextView(host.requireContext()); muscle.setTag("muscle");
-            muscle.setTextSize(10); muscle.setTextColor(0xFFFFFFFF);
-            muscle.setPadding(10, 4, 10, 4);
+            muscle.setTextSize(12);
             LinearLayout.LayoutParams mp = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             mp.setMargins(8, 0, 0, 0); muscle.setLayoutParams(mp);
@@ -159,27 +119,6 @@ class PRsTab {
                     LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             wlp.setMargins(0, 6, 0, 0); wv.setLayoutParams(wlp);
             inner.addView(wv);
-
-            // Edit mode buttons row
-            LinearLayout btnRow = new LinearLayout(host.requireContext()); btnRow.setTag("btnRow");
-            btnRow.setOrientation(LinearLayout.HORIZONTAL);
-            LinearLayout.LayoutParams brlp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            brlp.setMargins(0, 8, 0, 0); btnRow.setLayoutParams(brlp);
-            btnRow.setVisibility(View.GONE);
-
-            // Universal green Edit button (same as Body/Cardio).
-            Button eb = new Button(host.requireContext()); eb.setTag("editBtn");
-            eb.setText("Edit"); ButtonStyles.edit(eb);
-            LinearLayout.LayoutParams ep = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            ep.setMargins(0, 0, 8, 0); eb.setLayoutParams(ep);
-            btnRow.addView(eb);
-
-            Button db = new Button(host.requireContext()); db.setTag("delBtn");
-            db.setText("Delete"); ButtonStyles.delete(db);
-            btnRow.addView(db);
-            inner.addView(btnRow);
 
             card.addView(inner);
             return new VH(card);
@@ -209,24 +148,36 @@ class PRsTab {
                 default:     pillColor = host.color(R.color.pill_other); break;
             }
             h.muscleGroup.setText(group);
-            h.muscleGroup.setBackgroundColor(pillColor);
+            h.muscleGroup.setTextColor(pillColor);
 
             // Edit mode
-            View btnRow = h.card.findViewWithTag("btnRow");
             h.handle.setVisibility(editMode ? View.VISIBLE : View.GONE);
-            if (btnRow != null) btnRow.setVisibility(editMode ? View.VISIBLE : View.GONE);
-
             if (editMode) {
                 h.handle.setOnTouchListener((v, event) -> {
                     if (event.getActionMasked() == android.view.MotionEvent.ACTION_DOWN)
                         touchHelper.startDrag(h);
                     return false;
                 });
-                h.editBtn.setOnClickListener(x -> showEditPR(r));
-                h.delBtn.setOnClickListener(x -> Dialogs.confirmDelete(host.requireContext(), "the \"" + r.getName() + "\" PR", () -> {
-                    host.repo.records.remove(r); host.repo.saveAsync(); notifyDataSetChanged();
-                }));
             }
+            h.card.setOnClickListener(x -> showEditPR(r));
+            h.card.setOnLongClickListener(v -> {
+                android.widget.PopupMenu m = new android.widget.PopupMenu(v.getContext(), h.name);
+                m.getMenu().add(0, 1, 0, "Update best");
+                m.getMenu().add(0, 2, 1, editMode ? "Done reordering" : "Reorder lifts");
+                m.getMenu().add(0, 3, 2, "Delete");
+                m.setOnMenuItemClickListener(item -> {
+                    switch (item.getItemId()) {
+                        case 1: showEditPR(r); break;
+                        case 2: editMode = !editMode; host.rebuild(); break;
+                        default: Dialogs.confirmDelete(host.requireContext(), "the \"" + r.getName() + "\" PR", () -> {
+                            host.repo.records.remove(r); host.repo.saveAsync(); notifyDataSetChanged();
+                        });
+                    }
+                    return true;
+                });
+                m.show();
+                return true;
+            });
         }
         @Override public int getItemCount() { return host.repo.records.size(); }
     }

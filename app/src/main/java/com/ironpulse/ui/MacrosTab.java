@@ -27,26 +27,22 @@ class MacrosTab {
     };
 
     private final MoreFragment host;
-    /** Edit mode: unlocks saved-food editing and manual Daily Targets. */
-    private boolean editMode = false;
 
     MacrosTab(MoreFragment host) { this.host = host; }
 
-    void resetEditMode() { editMode = false; }
-
     void build(LinearLayout c) {
         // ── Today's rings (consumed vs goal) ──
-        host.hdr(c, "Today");
+        host.hdr(c, "TODAY");
         double[] consumed = { host.repo.todayMacro(0), host.repo.todayMacro(1), host.repo.todayMacro(2), host.repo.todayMacro(3) };
         double[] goals = new double[4];
         boolean anyGoal = false;
         for (int i = 0; i < 4; i++) { goals[i] = host.parseD(host.repo.macroGoals[i]); if (goals[i] > 0) anyGoal = true; }
         if (!anyGoal) {
             TextView note = new TextView(host.requireContext());
-            note.setText("⤵  Rings stay empty until you set your Daily Targets below");
-            note.setTextColor(host.color(R.color.accent_2)); note.setTextSize(12);
-            note.setTypeface(null, android.graphics.Typeface.BOLD);
-            note.setPadding(0, 0, 0, 8);
+            note.setText("Set your daily targets to fill the rings  ›");
+            note.setTextColor(host.color(R.color.accent)); note.setTextSize(14);
+            note.setPadding(0, 0, 0, host.dp(8));
+            note.setOnClickListener(x -> showTargetsDialog());
             c.addView(note);
         }
         MacroRingsView rings = new MacroRingsView(host.requireContext());
@@ -57,12 +53,16 @@ class MacrosTab {
         rlp.setMargins(0, 0, 0, 8); rings.setLayoutParams(rlp);
         c.addView(rings);
 
-        // ── Calorie adherence history ──
-        if (!host.repo.foodLog.isEmpty()) {
+        // ── Calorie adherence history (only once something was logged in the window) ──
+        boolean anyIn30 = false;
+        for (int i = 0; i < 30 && !anyIn30; i++)
+            anyIn30 = !host.repo.foodLog.getOrDefault(LocalDate.now().minusDays(i), Collections.emptyList()).isEmpty();
+        if (anyIn30) {
             double goalCals = host.parseD(host.repo.macroGoals[0]);
             host.hdr(c, "Calories — last 30 days"
                     + (goalCals > 0 ? "  ·  goal " + (int) goalCals + " kcal" : ""));
             HistoryChartView chart = new HistoryChartView(host.requireContext());
+            chart.setBackgroundResource(R.drawable.tile_bg); chart.setClipToOutline(true);
             chart.setBgColor(host.themeColor(R.attr.colorCardBg));
             chart.setTextColor(host.themeColor(R.attr.colorTextMuted));
             List<Double> vals = new ArrayList<>();
@@ -82,93 +82,101 @@ class MacrosTab {
             c.addView(chart);
         }
 
-        // ── Quick-add chips (presets + saved foods) ──
-        host.hdr(c, "Quick Add  ·  tap to log");
+        // ── Quick-add chips: + Custom, presets, then your saved foods ──
+        host.sp(c, 8);
+        host.hdr(c, "QUICK ADD  ·  tap to log, hold a ★ food to edit");
         HorizontalScrollView hsv = new HorizontalScrollView(host.requireContext());
         hsv.setHorizontalScrollBarEnabled(false);
         LinearLayout chipRow = new LinearLayout(host.requireContext());
         chipRow.setOrientation(LinearLayout.HORIZONTAL);
-        for (Food f : PRESET_FOODS) chipRow.addView(foodChip(c, f, false));
-        for (Food f : host.repo.savedFoods) chipRow.addView(foodChip(c, f, true));
+        TextView custom = chip("+ Custom", true);
+        custom.setOnClickListener(x -> showAddFoodDialog(c));
+        chipRow.addView(custom);
+        for (Food f : host.repo.savedFoods) chipRow.addView(foodChip(f, true));
+        for (Food f : PRESET_FOODS) chipRow.addView(foodChip(f, false));
         hsv.addView(chipRow);
         c.addView(hsv);
-        host.sp(c, 6);
-
-        Button custom = host.btn(c, "+ Add Custom Food", host.color(R.color.accent));
-        custom.setOnClickListener(x -> showAddFoodDialog(c));
 
         // ── Today's logged foods ──
         List<Food> today = host.repo.foodLog.getOrDefault(LocalDate.now(), Collections.emptyList());
-        host.sp(c, 12);
-        LinearLayout logHdr = new LinearLayout(host.requireContext());
-        logHdr.setOrientation(LinearLayout.HORIZONTAL);
-        logHdr.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        TextView lh = new TextView(host.requireContext());
-        lh.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        lh.setText("Logged Today (" + today.size() + ")");
-        lh.setTextColor(host.themeColor(R.attr.colorTextMuted)); lh.setTextSize(11);
-        logHdr.addView(lh);
-        if (!today.isEmpty()) {
-            Button clr = new Button(host.requireContext());
-            clr.setText("Clear All"); ButtonStyles.delete(clr);
-            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            clp.setMargins(0, 0, 6, 0); clr.setLayoutParams(clp);
-            clr.setOnClickListener(x -> Dialogs.confirm(host.requireContext(), "Clear log",
-                    "Are you sure you want to clear everything logged today?", "Clear All", () -> {
-                host.repo.foodLog.remove(LocalDate.now()); host.repo.saveAsync(); host.rebuild();
-            }));
-            logHdr.addView(clr);
-        }
-        // Edit toggle: unlocks saved-food chips and the Daily Targets fields below
-        Button fe = new Button(host.requireContext());
-        fe.setText(editMode ? "Done" : "Edit"); ButtonStyles.toggle(fe, editMode);
-        fe.setOnClickListener(x -> { editMode = !editMode; host.rebuild(); });
-        logHdr.addView(fe);
-        c.addView(logHdr);
-
+        host.sp(c, 20);
+        host.hdr(c, "TODAY'S LOG" + (today.isEmpty() ? "" : "  ·  hold to remove"));
         if (today.isEmpty()) {
             TextView empty = new TextView(host.requireContext());
-            empty.setText("Nothing logged yet — tap a food above to add it.");
-            empty.setTextColor(host.themeColor(R.attr.colorTextMuted)); empty.setTextSize(12);
-            empty.setPadding(0, 8, 0, 0);
+            empty.setText("Nothing logged yet — tap a food above.");
+            empty.setTextColor(host.themeColor(R.attr.colorTextMuted)); empty.setTextSize(14);
             c.addView(empty);
         } else {
             for (int i = today.size() - 1; i >= 0; i--) c.addView(loggedFoodRow(today.get(i)));
         }
 
-        // ── Goal targets + calculator ──
-        host.sp(c, 16);
-        host.hdr(c, editMode ? "Daily Targets (Goal)"
-                : "Daily Targets (Goal)  ·  tap Edit above to change manually");
-        for (int i = 0; i < 4; i++) { final int idx = i; editRow(c, MACRO_LABELS[i], host.repo.macroGoals[i],
-                v -> { host.repo.macroGoals[idx] = v; host.repo.saveDebounced(); }); }
-        host.sp(c, 12);
-        Button pb = host.btn(c, "Use Macro Preset Calculator", host.color(R.color.accent));
-        pb.setOnClickListener(x -> showMacroPreset());
+        // ── Goal targets (one row; the dialog holds the fields + calculator) ──
+        host.sp(c, 20);
+        host.hdr(c, "DAILY TARGETS");
+        LinearLayout tr = host.row();
+        TextView tl = new TextView(host.requireContext());
+        tl.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        tl.setText(anyGoal
+                ? String.format(java.util.Locale.US, "%d kcal  ·  P %d  ·  C %d  ·  F %d",
+                    (int) goals[0], (int) goals[1], (int) goals[2], (int) goals[3])
+                : "Not set");
+        tl.setTextColor(host.themeColor(R.attr.colorTextPrimary)); tl.setTextSize(15);
+        TextView tv = new TextView(host.requireContext());
+        tv.setText("›"); tv.setTextColor(host.themeColor(R.attr.colorTextMuted)); tv.setTextSize(15);
+        tr.addView(tl); tr.addView(tv);
+        tr.setOnClickListener(x -> showTargetsDialog());
+        c.addView(tr);
     }
 
-    /** A tappable food pill. Tap → log to today; in edit mode, tap a saved food → edit/delete it. */
-    private TextView foodChip(LinearLayout c, Food f, boolean saved) {
+    /** Daily targets: four fields, plus the preset calculator one tap away. */
+    private void showTargetsDialog() {
+        LinearLayout l = new LinearLayout(host.requireContext());
+        l.setOrientation(LinearLayout.VERTICAL);
+        l.setPadding(host.dp(24), host.dp(8), host.dp(24), 0);
+        EditText[] fields = new EditText[4];
+        for (int i = 0; i < 4; i++) {
+            fields[i] = new EditText(host.requireContext());
+            fields[i].setHint(MACRO_LABELS[i]);
+            fields[i].setText(host.repo.macroGoals[i]);
+            fields[i].setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+            TextView lbl = new TextView(host.requireContext());
+            lbl.setText(MACRO_LABELS[i]); lbl.setTextSize(12);
+            lbl.setTextColor(host.themeColor(R.attr.colorTextMuted));
+            l.addView(lbl); l.addView(fields[i]);
+        }
+        new AlertDialog.Builder(host.requireContext())
+            .setTitle("Daily targets")
+            .setView(l)
+            .setPositiveButton("Save", (d, w) -> {
+                for (int i = 0; i < 4; i++) host.repo.macroGoals[i] = fields[i].getText().toString().trim();
+                host.repo.saveAsync(); host.rebuild();
+            })
+            .setNeutralButton("Calculator", (d, w) -> showMacroPreset())
+            .setNegativeButton("Cancel", null).show();
+    }
+
+    private TextView chip(String text, boolean highlight) {
         TextView chip = new TextView(host.requireContext());
-        chip.setText((saved ? "★ " : "") + f.getName() + "  ·  " + (int) f.getCals());
-        chip.setTextSize(11); chip.setTextColor(host.color(R.color.white));
-        chip.setBackgroundResource(saved ? R.drawable.btn_accent_dark : R.drawable.btn_secondary);
-        chip.setPadding(20, 12, 20, 12);
+        chip.setText(text);
+        chip.setTextSize(13);
+        chip.setTextColor(highlight ? host.color(R.color.accent) : host.themeColor(R.attr.colorTextPrimary));
+        chip.setBackgroundResource(R.drawable.btn_quiet);
+        chip.setPadding(host.dp(14), host.dp(9), host.dp(14), host.dp(9));
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lp.setMargins(0, 0, 8, 0); chip.setLayoutParams(lp);
+        lp.setMargins(0, 0, host.dp(8), 0); chip.setLayoutParams(lp);
+        return chip;
+    }
+
+    /** A food pill. Tap → log to today; long-press a saved (★) food → edit or delete it. */
+    private TextView foodChip(Food f, boolean saved) {
+        TextView chip = chip((saved ? "★ " : "") + f.getName() + "  ·  " + (int) f.getCals(), false);
         chip.setOnClickListener(x -> {
-            if (editMode) {
-                if (saved) showEditFoodDialog(f);
-                else Toast.makeText(host.requireContext(),
-                        "Built-in food — can't be edited", Toast.LENGTH_SHORT).show();
-                return;
-            }
             addFoodToday(new Food(f.getName(), f.getCals(), f.getProtein(), f.getCarbs(), f.getFats()));
             host.rebuild();
             Toast.makeText(host.requireContext(), "Added " + f.getName(), Toast.LENGTH_SHORT).show();
         });
+        if (saved) chip.setOnLongClickListener(x -> { showEditFoodDialog(f); return true; });
         return chip;
     }
 
@@ -212,35 +220,30 @@ class MacrosTab {
         LinearLayout row = new LinearLayout(host.requireContext());
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(android.view.Gravity.CENTER_VERTICAL);
-        row.setBackgroundColor(host.themeColor(R.attr.colorCardBg));
-        row.setPadding(16, 12, 16, 12);
+        row.setBackgroundResource(R.drawable.tile_bg);
+        row.setPadding(host.dp(16), host.dp(12), host.dp(16), host.dp(12));
         LinearLayout.LayoutParams rlp = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        rlp.setMargins(0, 0, 0, 6); row.setLayoutParams(rlp);
+        rlp.setMargins(0, 0, 0, host.dp(6)); row.setLayoutParams(rlp);
 
         LinearLayout txt = new LinearLayout(host.requireContext());
         txt.setOrientation(LinearLayout.VERTICAL);
         txt.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         TextView nm = new TextView(host.requireContext());
-        nm.setText(f.getName()); nm.setTextColor(host.themeColor(R.attr.colorTextPrimary)); nm.setTextSize(13);
+        nm.setText(f.getName()); nm.setTextColor(host.themeColor(R.attr.colorTextPrimary)); nm.setTextSize(15);
         TextView mc = new TextView(host.requireContext());
         mc.setText(String.format(java.util.Locale.US, "%d kcal · P%d C%d F%d",
                 (int) f.getCals(), (int) f.getProtein(), (int) f.getCarbs(), (int) f.getFats()));
-        mc.setTextColor(host.themeColor(R.attr.colorTextMuted)); mc.setTextSize(11);
+        mc.setTextColor(host.themeColor(R.attr.colorTextMuted)); mc.setTextSize(13);
         txt.addView(nm); txt.addView(mc);
         row.addView(txt);
 
-        // Delete only appears in edit mode — the log stays clean while browsing.
-        if (editMode) {
-            Button rm = new Button(host.requireContext());
-            rm.setText("Delete"); ButtonStyles.delete(rm);
-            rm.setOnClickListener(x -> Dialogs.confirmDelete(host.requireContext(), "\"" + f.getName() + "\" from today's log", () -> {
+        Dialogs.longPressEditDelete(row, null, () ->
+            Dialogs.confirmDelete(host.requireContext(), "\"" + f.getName() + "\" from today's log", () -> {
                 List<Food> list = host.repo.foodLog.get(LocalDate.now());
                 if (list != null) { list.remove(f); if (list.isEmpty()) host.repo.foodLog.remove(LocalDate.now()); }
                 host.repo.saveAsync(); host.rebuild();
             }));
-            row.addView(rm);
-        }
         return row;
     }
 
@@ -275,36 +278,6 @@ class MacrosTab {
                 if (saveIt.isChecked()) host.repo.savedFoods.add(f);
                 host.repo.saveAsync(); host.rebuild();
             }).setNegativeButton("Cancel", null).show();
-    }
-
-    private void editRow(LinearLayout container, String label, String value, java.util.function.Consumer<String> onSave) {
-        LinearLayout row = host.row();
-        TextView lbl = new TextView(host.requireContext());
-        lbl.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        lbl.setText(label); lbl.setTextColor(host.themeColor(R.attr.colorTextPrimary)); lbl.setTextSize(13);
-        EditText field = new EditText(host.requireContext());
-        field.setText(value);
-        field.setHint("0");
-        field.setTextColor(host.themeColor(R.attr.colorTextPrimary));
-        field.setHintTextColor(host.themeColor(R.attr.colorTextMuted));
-        field.setTextSize(13);
-        field.setBackgroundResource(R.drawable.field_bg);
-        field.setPadding(16, 8, 16, 8);
-        field.setMinWidth(120);
-        field.setInputType(android.text.InputType.TYPE_CLASS_NUMBER | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        LinearLayout.LayoutParams fp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        fp.setMargins(8, 0, 0, 0);
-        field.setLayoutParams(fp);
-        // Manual changes require Edit mode — the preset calculator still works anytime.
-        field.setEnabled(editMode);
-        field.setAlpha(editMode ? 1f : 0.6f);
-        field.addTextChangedListener(new android.text.TextWatcher() {
-            public void beforeTextChanged(CharSequence s, int st, int c, int a) {}
-            public void onTextChanged(CharSequence s, int st, int b, int c) {}
-            public void afterTextChanged(android.text.Editable s) { onSave.accept(s.toString().trim()); }
-        });
-        row.addView(lbl); row.addView(field); container.addView(row);
     }
 
     private void showMacroPreset() {

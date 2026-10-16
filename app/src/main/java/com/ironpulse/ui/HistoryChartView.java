@@ -17,8 +17,8 @@ public class HistoryChartView extends View {
     // Full dataset — index 0 = oldest, last = most recent (today)
     private List<Double> values;
     private List<String> labels;
-    private int bgColor = 0xFF181E2C;
-    private int textCol = 0xFF72889E;
+    private int bgColor = 0xFF151A22;
+    private int textCol = 0xFF6B7686;
 
     private static final int VISIBLE_BARS = 7;
     private static final float PAD_L = 96f, PAD_R = 16f;
@@ -56,7 +56,7 @@ public class HistoryChartView extends View {
     }
 
     private void init() {
-        barPaint.setColor(0xFF22C882);
+        barPaint.setColor(0xFF3EE08F);
         goldPaint.setColor(0xFFFFB937);
         textPaint.setTextAlign(Paint.Align.CENTER);
         axisPaint.setTextAlign(Paint.Align.RIGHT);
@@ -218,7 +218,7 @@ public class HistoryChartView extends View {
             float thumbW = Math.max(chartW * frac, 28f);
             float ms = maxScroll();
             float thumbX = padL + (chartW - thumbW) * (ms <= 0 ? 0 : scrollPx / ms);
-            gridPaint.setColor(0xFF22C882);
+            gridPaint.setColor(0xFF3EE08F);
             canvas.drawRoundRect(r(thumbX, trackY, thumbX + thumbW, trackY + trackH), trackH / 2, trackH / 2, gridPaint);
             gridPaint.setStyle(Paint.Style.STROKE);
 

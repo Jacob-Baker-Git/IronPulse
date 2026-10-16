@@ -1,79 +1,59 @@
 package com.ironpulse.ui;
 
 import android.app.AlertDialog;
+import android.content.res.ColorStateList;
+import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.*;
+import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.ItemTouchHelper;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 import com.ironpulse.R;
 import com.ironpulse.data.Units;
 import com.ironpulse.notify.Notifications;
 import com.ironpulse.notify.Reminders;
+import java.util.*;
 
-/** "Settings" tab of the More screen: theme, sex, units, reminders, backup, clear. */
+/** Settings page: look & units, bottom bar, reminders, your data. */
 class SettingsTab {
     private final MoreFragment host;
 
     SettingsTab(MoreFragment host) { this.host = host; }
 
     void build(LinearLayout c) {
-        host.hdr(c, "Settings"); host.sp(c, 8);
-
-        // Light Mode toggle (off by default = dark mode on)
-        LinearLayout dmRow = host.row();
-        TextView dml = new TextView(host.requireContext());
-        dml.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        dml.setText("Light Mode"); dml.setTextColor(host.themeColor(R.attr.colorTextPrimary)); dml.setTextSize(14);
-        Switch dms = new Switch(host.requireContext());
+        host.hdr(c, "LOOK & UNITS");
         // Switch ON = light mode. repo.darkMode=true means dark is on, so lightMode = !darkMode
-        dms.setChecked(!host.repo.darkMode);
-        dms.setOnCheckedChangeListener((b, lightModeOn) -> {
+        switchRow(c, "Light mode", !host.repo.darkMode, lightModeOn -> {
             host.repo.darkMode = !lightModeOn; host.repo.saveAsync();
-            if (host.getActivity() instanceof MainActivity) {
+            if (host.getActivity() instanceof MainActivity)
                 ((MainActivity) host.getActivity()).applyTheme(!lightModeOn);
-            }
         });
-        dmRow.addView(dml); dmRow.addView(dms); c.addView(dmRow); host.sp(c, 6);
-
-        // Sex — universal value used by the macro calculator and body calculations
-        LinearLayout sexRow = host.row();
-        TextView sexLbl = new TextView(host.requireContext());
-        sexLbl.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        sexLbl.setText("Sex"); sexLbl.setTextColor(host.themeColor(R.attr.colorTextPrimary)); sexLbl.setTextSize(14);
-        TextView sexVal = new TextView(host.requireContext());
-        sexVal.setText((host.repo.gender == null || host.repo.gender.isEmpty() ? "Not set" : host.repo.gender) + "  ›");
-        sexVal.setTextColor(host.color(R.color.accent)); sexVal.setTextSize(13);
-        sexRow.addView(sexLbl); sexRow.addView(sexVal);
-        sexRow.setOnClickListener(x -> new AlertDialog.Builder(host.requireContext())
-            .setTitle("Sex")
-            .setItems(new String[]{"Male", "Female"}, (d, which) -> {
-                host.repo.gender = which == 0 ? "Male" : "Female";
-                host.repo.saveAsync(); host.rebuild();
-            }).show());
-        c.addView(sexRow); host.sp(c, 6);
-
         // Weight unit — display-only; kilograms are always what gets stored
-        LinearLayout unitRow = host.row();
-        TextView unitLbl = new TextView(host.requireContext());
-        unitLbl.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        unitLbl.setText("Show weights in pounds (lbs)");
-        unitLbl.setTextColor(host.themeColor(R.attr.colorTextPrimary)); unitLbl.setTextSize(14);
-        Switch unitSw = new Switch(host.requireContext());
-        unitSw.setChecked(host.repo.useLbs);
-        unitSw.setOnCheckedChangeListener((b, lbs) -> {
+        switchRow(c, "Weights in pounds (lbs)", host.repo.useLbs, lbs -> {
             host.repo.useLbs = lbs;
             Units.setUseLbs(lbs);
             host.repo.saveAsync();
         });
-        unitRow.addView(unitLbl); unitRow.addView(unitSw);
-        c.addView(unitRow); host.sp(c, 6);
+        // Sex — universal value used by the macro calculator and body calculations
+        linkRow(c, "Sex", host.repo.gender == null || host.repo.gender.isEmpty() ? "Not set" : host.repo.gender,
+            () -> new AlertDialog.Builder(host.requireContext())
+                .setTitle("Sex")
+                .setItems(new String[]{"Male", "Female"}, (d, which) -> {
+                    host.repo.gender = which == 0 ? "Male" : "Female";
+                    host.repo.saveAsync(); host.rebuild();
+                }).show());
 
+        host.sp(c, 14);
+        host.hdr(c, "BOTTOM BAR");
+        linkRow(c, "Choose and order bar items", host.repo.navBar.size() + " pinned", this::showBarEditor);
+
+        host.sp(c, 14);
+        host.hdr(c, "REMINDERS");
         // Daily workout reminder — only fires on days with unfinished exercises
-        LinearLayout remRow = host.row();
-        TextView remLbl = new TextView(host.requireContext());
-        remLbl.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        remLbl.setText("Workout day reminder");
-        remLbl.setTextColor(host.themeColor(R.attr.colorTextPrimary)); remLbl.setTextSize(14);
-        Switch remSw = new Switch(host.requireContext());
-        remSw.setChecked(host.repo.reminderEnabled);
-        remSw.setOnCheckedChangeListener((b, on) -> {
+        switchRow(c, "Workout day reminder", host.repo.reminderEnabled, on -> {
             host.repo.reminderEnabled = on;
             host.repo.saveAsync();
             if (on) {
@@ -87,44 +67,24 @@ class SettingsTab {
             }
             host.rebuild(); // show/hide the time row
         });
-        remRow.addView(remLbl); remRow.addView(remSw);
-        c.addView(remRow); host.sp(c, 6);
-
         if (host.repo.reminderEnabled) {
-            LinearLayout timeRow = host.row();
-            TextView timeLbl = new TextView(host.requireContext());
-            timeLbl.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-            timeLbl.setText("Reminder time");
-            timeLbl.setTextColor(host.themeColor(R.attr.colorTextPrimary)); timeLbl.setTextSize(14);
-            TextView timeVal = new TextView(host.requireContext());
-            timeVal.setText(String.format(java.util.Locale.US, "%02d:%02d  ›",
-                    host.repo.reminderHour, host.repo.reminderMinute));
-            timeVal.setTextColor(host.color(R.color.accent)); timeVal.setTextSize(13);
-            timeRow.addView(timeLbl); timeRow.addView(timeVal);
-            timeRow.setOnClickListener(x -> new android.app.TimePickerDialog(host.requireContext(),
-                (picker, h, m) -> {
-                    host.repo.reminderHour = h; host.repo.reminderMinute = m;
-                    host.repo.saveAsync();
-                    Reminders.schedule(host.requireContext(), h, m);
-                    host.rebuild();
-                }, host.repo.reminderHour, host.repo.reminderMinute, true).show());
-            c.addView(timeRow); host.sp(c, 6);
+            linkRow(c, "Reminder time", String.format(java.util.Locale.US, "%02d:%02d",
+                    host.repo.reminderHour, host.repo.reminderMinute),
+                () -> new android.app.TimePickerDialog(host.requireContext(),
+                    (picker, h, m) -> {
+                        host.repo.reminderHour = h; host.repo.reminderMinute = m;
+                        host.repo.saveAsync();
+                        Reminders.schedule(host.requireContext(), h, m);
+                        host.rebuild();
+                    }, host.repo.reminderHour, host.repo.reminderMinute, true).show());
         }
-        host.sp(c, 6);
-        host.infoRow(c, "Data location", "App internal storage");
-        host.infoRow(c, "Auto-save", "On every change");
-        host.infoRow(c, "Exercise schedule", "Weekly, on the days you pick"); host.sp(c, 16);
 
-        // Backup — everything lives in internal storage, so give users a way out
-        Button exp = host.btn(c, "Export Data (backup)", host.color(R.color.accent));
-        exp.setOnClickListener(x -> host.exportData());
-        Button imp = host.btn(c, "Import Data (restore backup)", host.color(R.color.accent));
-        imp.setOnClickListener(x ->
+        host.sp(c, 14);
+        host.hdr(c, "YOUR DATA · stored only on this phone");
+        linkRow(c, "Export backup", "", host::exportData);
+        linkRow(c, "Restore from backup", "", () ->
                 host.importPicker.launch(new String[]{"application/zip", "application/octet-stream"}));
-        host.sp(c, 8);
-
-        Button clr = host.btn(c, "Clear All Data", host.color(R.color.danger));
-        clr.setOnClickListener(x -> new AlertDialog.Builder(host.requireContext())
+        TextView clear = linkRow(c, "Clear all data", "", () -> new AlertDialog.Builder(host.requireContext())
             .setTitle("Clear All Data")
             .setMessage("Are you sure? This will permanently delete ALL your workout, body, cardio, and PR data.")
             .setPositiveButton("Yes, delete everything", (d, w) ->
@@ -139,5 +99,123 @@ class SettingsTab {
                     .setNegativeButton("Cancel", null).show()
             )
             .setNegativeButton("Cancel", null).show());
+        clear.setTextColor(host.color(R.color.danger));
+    }
+
+    // ── Rows ─────────────────────────────────────────────────────────────────
+
+    private interface OnToggle { void set(boolean on); }
+
+    private void switchRow(LinearLayout c, String label, boolean checked, OnToggle onToggle) {
+        LinearLayout row = host.row();
+        TextView l = label(label);
+        Switch s = new Switch(host.requireContext());
+        s.setChecked(checked);
+        s.setOnCheckedChangeListener((b, on) -> onToggle.set(on));
+        row.setOnClickListener(v -> s.toggle());
+        row.addView(l); row.addView(s); c.addView(row);
+    }
+
+    /** A tappable row with an optional value and a chevron. Returns the label. */
+    private TextView linkRow(LinearLayout c, String label, String value, Runnable onTap) {
+        LinearLayout row = host.row();
+        TextView l = label(label);
+        TextView v = new TextView(host.requireContext());
+        v.setText(value.isEmpty() ? "›" : value + "  ›");
+        v.setTextColor(host.themeColor(R.attr.colorTextMuted)); v.setTextSize(14);
+        row.setOnClickListener(x -> onTap.run());
+        row.addView(l); row.addView(v); c.addView(row);
+        return l;
+    }
+
+    private TextView label(String text) {
+        TextView l = new TextView(host.requireContext());
+        l.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        l.setText(text); l.setTextColor(host.themeColor(R.attr.colorTextPrimary)); l.setTextSize(15);
+        return l;
+    }
+
+    // ── Bottom bar editor ────────────────────────────────────────────────────
+
+    /** Every feature with an on/off switch, drag ≡ to reorder. Pinned ones first, in bar order. */
+    private void showBarEditor() {
+        List<Features.Feature> order = new ArrayList<>();
+        Set<String> on = new HashSet<>();
+        for (String id : host.repo.navBar) {
+            Features.Feature f = Features.byId(id);
+            if (f != null && !order.contains(f)) { order.add(f); on.add(id); }
+        }
+        for (Features.Feature f : Features.ALL) if (!order.contains(f)) order.add(f);
+
+        RecyclerView rv = new RecyclerView(host.requireContext());
+        rv.setLayoutManager(new LinearLayoutManager(host.requireContext()));
+        rv.setPadding(host.dp(8), host.dp(8), host.dp(8), 0);
+        final ItemTouchHelper[] drag = new ItemTouchHelper[1];
+        RecyclerView.Adapter<RecyclerView.ViewHolder> adapter = new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+            @NonNull @Override public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup p, int t) {
+                LinearLayout r = new LinearLayout(p.getContext());
+                r.setGravity(Gravity.CENTER_VERTICAL);
+                r.setPadding(host.dp(12), host.dp(10), host.dp(12), host.dp(10));
+                r.setLayoutParams(new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                return new RecyclerView.ViewHolder(r) {};
+            }
+            @Override public void onBindViewHolder(@NonNull RecyclerView.ViewHolder h, int pos) {
+                LinearLayout r = (LinearLayout) h.itemView;
+                r.removeAllViews();
+                Features.Feature f = order.get(pos);
+                ImageView handle = icon(R.drawable.ic_drag, host.themeColor(R.attr.colorTextMuted));
+                handle.setContentDescription("Drag to reorder");
+                handle.setOnTouchListener((v, e) -> {
+                    if (e.getActionMasked() == MotionEvent.ACTION_DOWN) drag[0].startDrag(h);
+                    return false;
+                });
+                r.addView(handle);
+                ImageView ic = icon(f.icon, host.themeColor(R.attr.colorTextPrimary));
+                ((LinearLayout.LayoutParams) ic.getLayoutParams()).leftMargin = host.dp(14);
+                r.addView(ic);
+                TextView l = label(f.label);
+                l.setPadding(host.dp(12), 0, 0, 0);
+                r.addView(l);
+                Switch s = new Switch(host.requireContext());
+                s.setChecked(on.contains(f.id));
+                s.setOnCheckedChangeListener((b, checked) -> { if (checked) on.add(f.id); else on.remove(f.id); });
+                r.addView(s);
+            }
+            @Override public int getItemCount() { return order.size(); }
+        };
+        rv.setAdapter(adapter);
+        drag[0] = new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(ItemTouchHelper.UP | ItemTouchHelper.DOWN, 0) {
+            @Override public boolean onMove(@NonNull RecyclerView r, @NonNull RecyclerView.ViewHolder a, @NonNull RecyclerView.ViewHolder b) {
+                int from = a.getAdapterPosition(), to = b.getAdapterPosition();
+                Collections.swap(order, from, to);
+                adapter.notifyItemMoved(from, to);
+                return true;
+            }
+            @Override public void onSwiped(@NonNull RecyclerView.ViewHolder vh, int dir) {}
+            @Override public boolean isLongPressDragEnabled() { return false; }
+        });
+        drag[0].attachToRecyclerView(rv);
+
+        new AlertDialog.Builder(host.requireContext())
+            .setTitle("Bottom bar")
+            .setMessage("Switch on what you want on the bar. ••• (everything + settings) is always last.")
+            .setView(rv)
+            .setPositiveButton("Done", (d, w) -> {
+                host.repo.navBar.clear();
+                for (Features.Feature f : order) if (on.contains(f.id)) host.repo.navBar.add(f.id);
+                host.repo.saveAsync();
+                if (host.getActivity() instanceof MainActivity) ((MainActivity) host.getActivity()).rebuildBar();
+                host.rebuild();
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+
+    private ImageView icon(int res, int tint) {
+        ImageView iv = new ImageView(host.requireContext());
+        iv.setImageResource(res);
+        iv.setImageTintList(ColorStateList.valueOf(tint));
+        iv.setLayoutParams(new LinearLayout.LayoutParams(host.dp(22), host.dp(22)));
+        return iv;
     }
 }

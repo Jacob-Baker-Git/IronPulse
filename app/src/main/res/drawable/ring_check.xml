@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Round tick-off control on Today's rows. Used as the background of a 44dp
+     touch target; the 9dp inset keeps the visible ring at 26dp. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_checked="true">
+        <inset android:inset="9dp">
+            <layer-list>
+                <item><shape android:shape="oval"><solid android:color="@color/accent"/></shape></item>
+                <item android:drawable="@drawable/ic_tick" android:top="5dp" android:bottom="5dp" android:left="5dp" android:right="5dp"/>
+            </layer-list>
+        </inset>
+    </item>
+    <item>
+        <inset android:inset="9dp">
+            <shape android:shape="oval">
+                <stroke android:width="2dp" android:color="?attr/colorBorder"/>
+            </shape>
+        </inset>
+    </item>
+</selector>
