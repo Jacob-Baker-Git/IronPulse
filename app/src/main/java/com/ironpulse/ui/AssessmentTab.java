@@ -71,24 +71,24 @@ class AssessmentTab {
         String splitType=detectSplit(byDay,trainingDays);
         StringBuilder r=new StringBuilder();
         r.append("━━━━━━━━━━━━━━━━━━━━━━━\n");
-        r.append(String.format("  SCORE  %d%%  (%s)\n",score,grade));
+        r.append(String.format(java.util.Locale.US, "  SCORE  %d%%  (%s)\n",score,grade));
         r.append("━━━━━━━━━━━━━━━━━━━━━━━\n\n");
-        r.append(String.format("Split type:      %s\n",splitType));
-        r.append(String.format("Training days:   %d/7\n",trainingDays));
-        r.append(String.format("Total sets/wk:   %d\n",totalSets));
-        r.append(String.format("Sets/session:    %d\n",setsPerSession));
-        r.append(String.format("Avg rest:        %.0fs\n\n",avgRest));
+        r.append(String.format(java.util.Locale.US, "Split type:      %s\n",splitType));
+        r.append(String.format(java.util.Locale.US, "Training days:   %d/7\n",trainingDays));
+        r.append(String.format(java.util.Locale.US, "Total sets/wk:   %d\n",totalSets));
+        r.append(String.format(java.util.Locale.US, "Sets/session:    %d\n",setsPerSession));
+        r.append(String.format(java.util.Locale.US, "Avg rest:        %.0fs\n\n",avgRest));
         r.append("MUSCLE GROUPS\n─────────────────────\n");
         int maxS=Math.max(1,Math.max(push,Math.max(pull,legs)));
         for (String[] g:new String[][]{{"Push",String.valueOf(push)},{"Pull",String.valueOf(pull)},
                 {"Legs",String.valueOf(legs)},{"Arms",String.valueOf(arms)},{"Core",String.valueOf(core)}}) {
             int s=Integer.parseInt(g[1]); if (s==0) continue;
             int bars=Math.max(1,(int)((double)s/maxS*10));
-            r.append(String.format("%-5s  %-11s  %2d sets\n",g[0],"█".repeat(bars)+"░".repeat(10-bars),s));
+            r.append(String.format(java.util.Locale.US, "%-5s  %-11s  %2d sets\n",g[0],"█".repeat(bars)+"░".repeat(10-bars),s));
         }
         if (push>0&&pull>0) {
             double ratio=(double)Math.min(push,pull)/Math.max(push,pull);
-            r.append(String.format("\nPush:Pull  %d:%d  %s\n",push,pull,
+            r.append(String.format(java.util.Locale.US, "\nPush:Pull  %d:%d  %s\n",push,pull,
                 ratio>=0.8?"✓ Balanced":push>pull?"⚠ Push-heavy":"⚠ Pull-heavy"));
         }
         r.append("\nCOACH NOTES\n─────────────────────\n");

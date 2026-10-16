@@ -38,6 +38,10 @@ public class HistoryChartView extends View {
     private final Paint axisPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint gridPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint basePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    // Reused every frame: the chart redraws continuously while it scrolls
+    private final RectF rect = new RectF();
+
+    private RectF r(float l, float t, float rr, float b) { rect.set(l, t, rr, b); return rect; }
 
     public HistoryChartView(Context ctx) { this(ctx, null); }
     public HistoryChartView(Context ctx, AttributeSet a) { this(ctx, a, 0); }
@@ -188,8 +192,7 @@ public class HistoryChartView extends View {
             float bot   = padT + chartH;
 
             if (vol > 0) {
-                RectF rect = new RectF(left, top, right, bot);
-                canvas.drawRoundRect(rect, cornerR, cornerR, p);
+                canvas.drawRoundRect(r(left, top, right, bot), cornerR, cornerR, p);
                 if (barH > cornerR) canvas.drawRect(left, top + cornerR, right, bot, p);
                 if (barH > 30) {
                     textPaint.setTextSize(26f); textPaint.setTextAlign(Paint.Align.CENTER);
@@ -210,13 +213,13 @@ public class HistoryChartView extends View {
             float trackY = h - 7f, trackH = 5f;
             gridPaint.setStyle(Paint.Style.FILL);
             gridPaint.setColor(0x33888888);
-            canvas.drawRoundRect(new RectF(padL, trackY, w - padR, trackY + trackH), trackH / 2, trackH / 2, gridPaint);
+            canvas.drawRoundRect(r(padL, trackY, w - padR, trackY + trackH), trackH / 2, trackH / 2, gridPaint);
             float frac = (float) VISIBLE_BARS / values.size();
             float thumbW = Math.max(chartW * frac, 28f);
             float ms = maxScroll();
             float thumbX = padL + (chartW - thumbW) * (ms <= 0 ? 0 : scrollPx / ms);
             gridPaint.setColor(0xFF22C882);
-            canvas.drawRoundRect(new RectF(thumbX, trackY, thumbX + thumbW, trackY + trackH), trackH / 2, trackH / 2, gridPaint);
+            canvas.drawRoundRect(r(thumbX, trackY, thumbX + thumbW, trackY + trackH), trackH / 2, trackH / 2, gridPaint);
             gridPaint.setStyle(Paint.Style.STROKE);
 
             if (!hasScrolled) {
@@ -237,7 +240,7 @@ public class HistoryChartView extends View {
 
     private String formatVol(double v) {
         if (v == 0) return "0";
-        if (v >= 1000) return String.format("%.1fk", v / 1000);
-        return v == Math.floor(v) ? String.valueOf((int)v) : String.format("%.0f", v);
+        if (v >= 1000) return String.format(java.util.Locale.US, "%.1fk", v / 1000);
+        return v == Math.floor(v) ? String.valueOf((int)v) : String.format(java.util.Locale.US, "%.0f", v);
     }
 }

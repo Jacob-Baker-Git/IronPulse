@@ -98,22 +98,25 @@ public class HistoryFragment extends Fragment {
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("d/MM");
         List<String> labels = new ArrayList<>();
         List<Double> values = new ArrayList<>();
+        // One pass over every logged set (not one per day): per-day volume and
+        // best estimated 1RM (Epley: w × (1 + reps/30)) for this lift.
+        LocalDate first = today.minusDays(59);
+        Map<LocalDate, Double> dayVolume = new HashMap<>(), dayBest1rm = new HashMap<>();
+        for (SetLog s2 : repo.setLogs) {
+            if (s2.getDate().isBefore(first) || !s2.getExerciseName().equals(name)) continue;
+            dayVolume.merge(s2.getDate(), s2.volume(), Double::sum);
+            if (!s2.isBodyweight() && s2.getWeightKg() > 0)
+                dayBest1rm.merge(s2.getDate(), s2.getWeightKg() * (1 + s2.getReps() / 30.0), Math::max);
+        }
         // 60 days of data so user can scroll back ~2 months
         for (int i = 59; i >= 0; i--) {
             LocalDate d = today.minusDays(i);
             double val;
             if (metric == 1) {
-                // Best estimated 1RM that day (Epley: w × (1 + reps/30)) from real sets
-                val = repo.setLogs.stream()
-                        .filter(s2 -> s2.getExerciseName().equals(name) && s2.getDate().equals(d)
-                                  && !s2.isBodyweight() && s2.getWeightKg() > 0)
-                        .mapToDouble(s2 -> s2.getWeightKg() * (1 + s2.getReps() / 30.0))
-                        .max().orElse(0);
+                val = dayBest1rm.getOrDefault(d, 0.0);
             } else {
                 // Prefer the actual logged sets — the truth of what was lifted that day.
-                val = repo.setLogs.stream()
-                        .filter(s2 -> s2.getExerciseName().equals(name) && s2.getDate().equals(d))
-                        .mapToDouble(SetLog::volume).sum();
+                val = dayVolume.getOrDefault(d, 0.0);
                 // Fall back to the planned-volume estimate for days completed via the
                 // checkbox without logging individual sets.
                 if (val == 0) {

@@ -42,6 +42,15 @@ public class WeightChartView extends View {
     private final Paint axisPaint  = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint gridPaint  = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint trendPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    // Reused every frame: the chart redraws continuously while it is dragged
+    private final RectF rect = new RectF();
+    private final Path fillPath = new Path(), linePath = new Path();
+    private LinearGradient fillShader;
+    private float shaderTop = -1, shaderBot = -1;
+    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("d MMM");
+
+    private float[] xs = new float[0], ys = new float[0];
+    private RectF r(float l, float t, float rr, float b) { rect.set(l, t, rr, b); return rect; }
 
     public WeightChartView(Context ctx) { this(ctx, null); }
     public WeightChartView(Context ctx, AttributeSet a) { this(ctx, a, 0); }
@@ -145,18 +154,15 @@ public class WeightChartView extends View {
 
         double tickStep = niceStep(range / 4.0);
         double firstTick = Math.ceil(minW / tickStep) * tickStep;
-        List<Double> ticks = new ArrayList<>();
-        for (double t = firstTick; t <= maxW + 0.001; t += tickStep) ticks.add(t);
-        for (double tick : ticks) {
+        for (double tick = firstTick; tick <= maxW + 0.001; tick += tickStep) {
             float y = yPos(tick, minW, range, padT, chartH);
             canvas.drawLine(padL, y, w - padR, y, gridPaint);
             axisPaint.setTextAlign(Paint.Align.RIGHT);
-            canvas.drawText(String.format("%.1f", tick), padL - 8, y + 9, axisPaint);
+            canvas.drawText(String.format(java.util.Locale.US, "%.1f", tick), padL - 8, y + 9, axisPaint);
         }
 
         // Point positions: index i at padL + (i - graphStartF) * sp
-        float[] xs = new float[n];
-        float[] ys = new float[n];
+        if (xs.length < n) { xs = new float[n]; ys = new float[n]; } // grow only when needed
         for (int i = 0; i < n; i++) {
             xs[i] = padL + (i - graphStartF) * sp;
             ys[i] = yPos(Units.toDisplay(data.get(i).getWeightKg()), minW, range, padT, chartH);
@@ -165,23 +171,28 @@ public class WeightChartView extends View {
         // Line + gradient fill (clipped to the plot area so it runs to the edges cleanly)
         canvas.save();
         canvas.clipRect(padL - 1, 0, w - padR + 1, h);
-        Path fillPath = new Path();
+        fillPath.reset();
         fillPath.moveTo(xs[0], padT + chartH);
         fillPath.lineTo(xs[0], ys[0]);
         for (int i = 1; i < n; i++) fillPath.lineTo(xs[i], ys[i]);
         fillPath.lineTo(xs[n - 1], padT + chartH);
         fillPath.close();
-        fillPaint.setShader(new LinearGradient(0, padT, 0, padT + chartH,
-                0x4422C882, 0x0022C882, Shader.TileMode.CLAMP));
+        if (fillShader == null || shaderTop != padT || shaderBot != padT + chartH) {
+            shaderTop = padT; shaderBot = padT + chartH;
+            fillShader = new LinearGradient(0, shaderTop, 0, shaderBot,
+                    0x4422C882, 0x0022C882, Shader.TileMode.CLAMP);
+        }
+        fillPaint.setShader(fillShader);
         canvas.drawPath(fillPath, fillPaint);
-        Path path = new Path();
+        Path path = linePath;
+        path.reset();
         path.moveTo(xs[0], ys[0]);
         for (int i = 1; i < n; i++) path.lineTo(xs[i], ys[i]);
         canvas.drawPath(path, linePaint);
         canvas.restore();
 
         // Dots + labels at each point's true x — uniform spacing, no edge preview.
-        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("d MMM");
+        DateTimeFormatter fmt = DATE_FMT;
         for (int i = 0; i < n; i++) {
             if (xs[i] < padL - 0.5f || xs[i] > w - padR + 0.5f) continue;
             dotRing.setColor(bgColor);
@@ -189,7 +200,7 @@ public class WeightChartView extends View {
             canvas.drawCircle(xs[i], ys[i], 6f, dotPaint);
             labelPaint.setTextAlign(Paint.Align.CENTER);
             labelPaint.setTextSize(32f);
-            canvas.drawText(String.format("%.1f", Units.toDisplay(data.get(i).getWeightKg())), xs[i], ys[i] - 14, labelPaint);
+            canvas.drawText(String.format(java.util.Locale.US, "%.1f", Units.toDisplay(data.get(i).getWeightKg())), xs[i], ys[i] - 14, labelPaint);
             labelPaint.setTextSize(28f);
             canvas.drawText(data.get(i).getDate().format(fmt), xs[i], padT + chartH + 32, labelPaint);
         }
@@ -197,8 +208,8 @@ public class WeightChartView extends View {
         // Trend across the range currently visible in the log
         int fv = Math.max(0, Math.round(visFirst)), lv = Math.min(n - 1, Math.round(visLast));
         double diff = Units.toDisplay(data.get(lv).getWeightKg() - data.get(fv).getWeightKg());
-        String trend = diff > 0.05 ? String.format("▲ +%.1f %s", diff, Units.unit())
-                     : diff < -0.05 ? String.format("▼ %.1f %s", diff, Units.unit()) : "→ stable";
+        String trend = diff > 0.05 ? String.format(java.util.Locale.US, "▲ +%.1f %s", diff, Units.unit())
+                     : diff < -0.05 ? String.format(java.util.Locale.US, "▼ %.1f %s", diff, Units.unit()) : "→ stable";
         trendPaint.setColor(diff > 0.05 ? 0xFFE64444 : diff < -0.05 ? 0xFF22C882 : 0xFFFFB937);
         trendPaint.setTextAlign(Paint.Align.RIGHT);
         canvas.drawText(trend, w - padR, padT - 8, trendPaint);
@@ -207,7 +218,7 @@ public class WeightChartView extends View {
         float trackY = h - 6f, trackH = 5f;
         gridPaint.setStyle(Paint.Style.FILL);
         gridPaint.setColor(0x33888888);
-        canvas.drawRoundRect(new RectF(padL, trackY, w - padR, trackY + trackH), trackH / 2, trackH / 2, gridPaint);
+        canvas.drawRoundRect(r(padL, trackY, w - padR, trackY + trackH), trackH / 2, trackH / 2, gridPaint);
         float overhang = 20f; // let the bar reach slightly past its end points
         float bx1 = padL + (visFirst - graphStartF) * sp - overhang;
         float bx2 = padL + (visLast - graphStartF) * sp + overhang;
@@ -215,7 +226,7 @@ public class WeightChartView extends View {
         bx2 = Math.max(padL, Math.min(bx2, w - padR));
         if (bx2 - bx1 < 24f) bx2 = Math.min(w - padR, bx1 + 24f);
         gridPaint.setColor(0xFF22C882);
-        canvas.drawRoundRect(new RectF(bx1, trackY, bx2, trackY + trackH), trackH / 2, trackH / 2, gridPaint);
+        canvas.drawRoundRect(r(bx1, trackY, bx2, trackY + trackH), trackH / 2, trackH / 2, gridPaint);
         gridPaint.setStyle(Paint.Style.STROKE);
     }
 

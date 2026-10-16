@@ -57,7 +57,7 @@ public class AppRepository {
         this.gson = new GsonBuilder()
                 .registerTypeAdapter(LocalDate.class, new LocalDateAdapter())
                 .registerTypeAdapter(DayOfWeek.class, new DayOfWeekAdapter())
-                .setPrettyPrinting().create();
+                .create(); // compact: every change rewrites these files
         load();
     }
 
@@ -153,10 +153,11 @@ public class AppRepository {
     public void renameExercise(ExerciseData ex, String newName) {
         String old = ex.getName();
         if (newName == null || newName.trim().isEmpty() || newName.trim().equals(old)) return;
+        List<SetLog> mine = new ArrayList<>();
+        for (SetLog s : setLogs) if (s.belongsTo(ex)) mine.add(s); // before the name changes
         ex.setName(newName.trim());
         String nu = ex.getName(); // as cleaned by the model
-        for (SetLog s : setLogs)
-            if (s.getExerciseName().equals(old)) s.setExerciseName(nu);
+        for (SetLog s : mine) { s.setExerciseName(nu); s.setExerciseId(ex.getId()); }
         boolean newHasRecord = false;
         for (RecordData r : records) if (r.getName().equalsIgnoreCase(nu)) newHasRecord = true;
         if (!newHasRecord)
@@ -170,7 +171,7 @@ public class AppRepository {
 
     public String classifyExercise(String name) {
         if (name==null) return "Other";
-        String n=name.toLowerCase();
+        String n=name.toLowerCase(java.util.Locale.ROOT);
         if (n.contains("bench")||n.contains("press")||n.contains("chest")||n.contains("push")||n.contains("shoulder")) return "Push";
         if (n.contains("row")||n.contains("pull")||n.contains("lat")||n.contains("deadlift")||n.contains("back")) return "Pull";
         if (n.contains("squat")||n.contains("leg")||n.contains("calf")||n.contains("lunge")||n.contains("ham")||n.contains("glute")) return "Legs";
@@ -268,6 +269,7 @@ public class AppRepository {
         if (card!=null) cardio.addAll(card);
         List<SetLog> sl=loadJson("setlogs.json",new TypeToken<List<SetLog>>(){}.getType());
         if (sl!=null) setLogs.addAll(sl);
+        attachLegacySetLogs();
         List<String> rd=loadJson("rest_days.json",new TypeToken<List<String>>(){}.getType());
         if (rd!=null) for (String s:rd) { try { restDays.add(java.time.DayOfWeek.valueOf(s)); } catch(Exception ignored) {} }
         List<List<String>> cs=loadJson("custom_splits.json",new TypeToken<List<List<String>>>(){}.getType());
@@ -297,8 +299,10 @@ public class AppRepository {
                         // History keeps showing its volume data.
                         if (!matched && parts.length>=5) {
                             try {
-                                doneList.add(new ExerciseData(nm, parts[2], parts[3],
-                                        Integer.parseInt(parts[4]), ad));
+                                ExerciseData ph=new ExerciseData(nm, parts[2], parts[3],
+                                        Integer.parseInt(parts[4]), ad);
+                                ph.setId(id); // keeps its set logs attached
+                                doneList.add(ph);
                             } catch(Exception ignored){}
                         }
                     }
@@ -328,6 +332,21 @@ public class AppRepository {
         }
         Units.setUseLbs(useLbs);
         if (records.isEmpty()) seedDefaultRecords();
+    }
+
+    /**
+     * Logs saved before set logs carried an exercise id get one when exactly one
+     * exercise has that name. Ambiguous names keep matching by name — there's no
+     * way to tell which of the duplicates they belonged to.
+     */
+    private void attachLegacySetLogs() {
+        Map<String,String> idByName = new HashMap<>();
+        Set<String> duplicated = new HashSet<>();
+        for (ExerciseData ex : exercises)
+            if (idByName.put(ex.getName(), ex.getId()) != null) duplicated.add(ex.getName());
+        for (SetLog s : setLogs)
+            if (s.getExerciseId() == null && !duplicated.contains(s.getExerciseName()))
+                s.setExerciseId(idByName.get(s.getExerciseName())); // null if deleted: stays legacy
     }
 
     private void seedDefaultRecords() {

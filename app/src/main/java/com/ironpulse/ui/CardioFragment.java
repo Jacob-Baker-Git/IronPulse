@@ -60,9 +60,9 @@ public class CardioFragment extends Fragment {
         double bp = repo.cardio.stream()
                 .filter(e -> e.getDistanceKm() > 0 && e.getDurationMinutes() > 0)
                 .mapToDouble(CardioEntry::getPaceMinPerKm).min().orElse(0);
-        weekDist.setText(wd > 0 ? String.format("%.1f km", wd) : "—");
+        weekDist.setText(wd > 0 ? String.format(java.util.Locale.US, "%.1f km", wd) : "—");
         totalSessions.setText(String.valueOf(repo.cardio.size()));
-        bestPace.setText(bp > 0 ? String.format("%.1f min/km", bp) : "—");
+        bestPace.setText(bp > 0 ? String.format(java.util.Locale.US, "%.1f min/km", bp) : "—");
 
         entryList.removeAllViews();
         List<CardioEntry> sorted = new ArrayList<>(repo.cardio);
@@ -123,10 +123,10 @@ public class CardioFragment extends Fragment {
             // Detail row
             String det;
             if (e.getDistanceKm() > 0 && e.getDurationMinutes() > 0)
-                det = String.format("%.1f km  |  %d min  |  %.1f min/km",
+                det = String.format(java.util.Locale.US, "%.1f km  |  %d min  |  %.1f min/km",
                         e.getDistanceKm(), e.getDurationMinutes(), e.getPaceMinPerKm());
             else if (e.getDistanceKm() > 0)
-                det = String.format("%.1f km", e.getDistanceKm());
+                det = String.format(java.util.Locale.US, "%.1f km", e.getDistanceKm());
             else
                 det = e.getDurationMinutes() + " min";
             if (e.getNotes() != null && !e.getNotes().isEmpty()) det += "  |  " + e.getNotes();

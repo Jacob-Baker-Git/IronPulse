@@ -224,7 +224,7 @@ class MacrosTab {
         TextView nm = new TextView(host.requireContext());
         nm.setText(f.getName()); nm.setTextColor(host.themeColor(R.attr.colorTextPrimary)); nm.setTextSize(13);
         TextView mc = new TextView(host.requireContext());
-        mc.setText(String.format("%d kcal · P%d C%d F%d",
+        mc.setText(String.format(java.util.Locale.US, "%d kcal · P%d C%d F%d",
                 (int) f.getCals(), (int) f.getProtein(), (int) f.getCarbs(), (int) f.getFats()));
         mc.setTextColor(host.themeColor(R.attr.colorTextMuted)); mc.setTextSize(11);
         txt.addView(nm); txt.addView(mc);
@@ -350,8 +350,8 @@ class MacrosTab {
                         default:                 cal=b*(male?33:30); pro=b*1.8; fat=b*1.0; break;
                     }
                     carb = Math.max(50, (cal - pro*4 - fat*9) / 4);
-                    host.repo.macroGoals[0]=String.format("%.0f",cal); host.repo.macroGoals[1]=String.format("%.0f",pro);
-                    host.repo.macroGoals[2]=String.format("%.0f",carb); host.repo.macroGoals[3]=String.format("%.0f",fat);
+                    host.repo.macroGoals[0]=String.format(java.util.Locale.US, "%.0f",cal); host.repo.macroGoals[1]=String.format(java.util.Locale.US, "%.0f",pro);
+                    host.repo.macroGoals[2]=String.format(java.util.Locale.US, "%.0f",carb); host.repo.macroGoals[3]=String.format(java.util.Locale.US, "%.0f",fat);
                     host.repo.saveAsync(); host.rebuild();
                 } catch (Exception e) { Toast.makeText(host.requireContext(),"Enter valid bodyweight",Toast.LENGTH_SHORT).show(); }
             }).setNegativeButton("Cancel", null).show();

@@ -47,7 +47,7 @@ public class BodyFragment extends Fragment {
         recycler        = v.findViewById(R.id.body_recycler);
         editBtn         = v.findViewById(R.id.btn_body_edit);
 
-        heightBtn.setText(repo.heightCm > 0 ? String.format("%.0f cm", repo.heightCm) : "Set Height");
+        heightBtn.setText(repo.heightCm > 0 ? String.format(java.util.Locale.US, "%.0f cm", repo.heightCm) : "Set Height");
         heightBtn.setOnClickListener(x -> showHeightDialog());
         Button addBtn = v.findViewById(R.id.btn_add_weight);
         ButtonStyles.log(addBtn);
@@ -222,7 +222,7 @@ public class BodyFragment extends Fragment {
         title.setTextColor(themeColor(R.attr.colorTextMuted)); title.setTextSize(11);
         title.setLetterSpacing(0.08f);
         TextView pct = new TextView(requireContext());
-        pct.setText((reached ? "✓ " : "") + String.format("%.0f%%", fill * 100));
+        pct.setText((reached ? "✓ " : "") + String.format(java.util.Locale.US, "%.0f%%", fill * 100));
         pct.setTextColor(color(R.color.accent)); pct.setTextSize(18);
         pct.setTypeface(null, android.graphics.Typeface.BOLD);
         titleRow.addView(title); titleRow.addView(pct);
@@ -375,7 +375,7 @@ public class BodyFragment extends Fragment {
             if (hm > 0) {
                 double bmi = e.getWeightKg() / (hm * hm);
                 String cat = bmi < 18.5 ? "Underweight" : bmi < 25 ? "Normal" : bmi < 30 ? "Overweight" : "Obese";
-                val.append(String.format("  ·  BMI %.1f (%s)", bmi, cat));
+                val.append(String.format(java.util.Locale.US, "  ·  BMI %.1f (%s)", bmi, cat));
             }
             h.val.setTextColor(textMuted);
             h.val.setText(val.toString());
@@ -397,7 +397,7 @@ public class BodyFragment extends Fragment {
                         LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
                 dlp.setMargins(6, 0, 0, 0); db.setLayoutParams(dlp);
                 db.setOnClickListener(x -> Dialogs.confirmDelete(requireContext(),
-                        String.format("the entry for %s (%.1f kg)", formatDate(e.getDate()), e.getWeightKg()), () -> {
+                        String.format(java.util.Locale.US, "the entry for %s (%.1f kg)", formatDate(e.getDate()), e.getWeightKg()), () -> {
                     repo.bodyEntries.remove(e);
                     repo.saveAsync();
                     if (repo.bodyEntries.isEmpty()) { editMode = false; editBtn.setText("Edit");
@@ -459,7 +459,7 @@ public class BodyFragment extends Fragment {
                         if (e2.getDate().equals(date) && e2 != existing) { dup = e2; break; }
                     if (dup != null) {
                         Dialogs.confirm(requireContext(), "Replace entry",
-                                String.format("You already logged %s on %s. Replace it with %s?",
+                                String.format(java.util.Locale.US, "You already logged %s on %s. Replace it with %s?",
                                         Units.fmt(dup.getWeightKg()), formatDate(date), Units.fmt(kg)), "Replace", commit);
                     } else {
                         commit.run();
@@ -483,7 +483,7 @@ public class BodyFragment extends Fragment {
                     if (cm <= 0 || cm > 300) throw new NumberFormatException();
                     repo.heightCm = cm;
                     repo.saveAsync();
-                    heightBtn.setText(String.format("%.0f cm", repo.heightCm));
+                    heightBtn.setText(String.format(java.util.Locale.US, "%.0f cm", repo.heightCm));
                     refresh();
                 } catch (Exception e) {
                     Toast.makeText(requireContext(), "Invalid height", Toast.LENGTH_SHORT).show();

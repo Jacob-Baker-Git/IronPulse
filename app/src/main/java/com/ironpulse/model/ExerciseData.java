@@ -44,7 +44,7 @@ public class ExerciseData {
     private void parseRepsString(String r) {
         sets = 3; repsPerSet = 10;
         if (r == null) return;
-        String[] p = r.toLowerCase().split("x");
+        String[] p = r.toLowerCase(java.util.Locale.ROOT).split("x");
         try { if (p.length > 0 && !p[0].trim().isEmpty()) sets = Math.max(1, (int) Double.parseDouble(p[0].trim().replaceAll("[^0-9.]",""))); } catch(Exception ignored) {}
         try {
             if (p.length > 1) repsPerSet = Math.max(1, (int) Double.parseDouble(p[1].trim().replaceAll("[^0-9.]","")));
@@ -62,6 +62,8 @@ public class ExerciseData {
     }
 
     public String getId() { return id; }
+    /** Only for rebuilding a deleted exercise's placeholder with its original id. */
+    public void setId(String id) { if (id != null && !id.isEmpty()) this.id = id; }
     public String getName() { return name; }
     public void setName(String n) { this.name=cleanName(n); }
 

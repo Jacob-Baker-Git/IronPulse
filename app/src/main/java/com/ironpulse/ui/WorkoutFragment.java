@@ -283,7 +283,7 @@ public class WorkoutFragment extends Fragment {
             boolean isRest  = repo.isRestDay(date);
             boolean isPast  = date.isBefore(today);
 
-            h.dayLbl.setText(date.format(DateTimeFormatter.ofPattern("EEE")).toUpperCase());
+            h.dayLbl.setText(date.format(DateTimeFormatter.ofPattern("EEE")).toUpperCase(java.util.Locale.ROOT));
             h.numLbl.setText(date.format(DateTimeFormatter.ofPattern("d")));
 
             android.util.TypedValue tv = new android.util.TypedValue();

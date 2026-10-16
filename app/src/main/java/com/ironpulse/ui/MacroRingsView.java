@@ -91,7 +91,7 @@ public class MacroRingsView extends View {
     }
 
     private String fmt(double v) {
-        if (v >= 1000) return String.format("%.1fk", v / 1000);
-        return v == Math.floor(v) ? String.valueOf((int) v) : String.format("%.0f", v);
+        if (v >= 1000) return String.format(java.util.Locale.US, "%.1fk", v / 1000);
+        return v == Math.floor(v) ? String.valueOf((int) v) : String.format(java.util.Locale.US, "%.0f", v);
     }
 }

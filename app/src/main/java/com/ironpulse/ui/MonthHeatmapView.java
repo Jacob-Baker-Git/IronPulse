@@ -80,7 +80,7 @@ public class MonthHeatmapView extends View {
         textPaint.setColor(textCol);
         textPaint.setTextSize(headerH * 0.45f);
         textPaint.setFakeBoldText(true);
-        String title = month.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH).toUpperCase()
+        String title = month.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH).toUpperCase(java.util.Locale.ROOT)
                 + " " + month.getYear();
         canvas.drawText(title, w / 2f, headerH * 0.62f, textPaint);
         canvas.drawText("‹", w * 0.08f, headerH * 0.62f, textPaint);

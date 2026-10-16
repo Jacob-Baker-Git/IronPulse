@@ -38,9 +38,10 @@ public class QuickLogReceiver extends BroadcastReceiver {
         if (ex == null) { RestNotifier.cancel(ctx); return; }
 
         final String fName = name;
+        final ExerciseData fEx = ex;
         final LocalDate fDate = date;
         int logged = (int) repo.setLogs.stream()
-                .filter(s -> s.getExerciseName().equals(fName) && s.getDate().equals(fDate))
+                .filter(s -> s.belongsTo(fEx) && s.getDate().equals(fDate))
                 .count();
         int target = b.getInt(RestNotifier.TARGET, ex.getSets());
         if (logged >= target) { RestNotifier.cancel(ctx); return; }
@@ -48,7 +49,7 @@ public class QuickLogReceiver extends BroadcastReceiver {
         double wKg = b.getDouble(RestNotifier.WEIGHT, ex.getWeightKg());
         int reps   = b.getInt(RestNotifier.REPS, ex.getRepsPerSet());
         logged++;
-        repo.setLogs.add(new SetLog(date, name, logged, wKg, reps, wKg <= 0));
+        repo.setLogs.add(new SetLog(date, ex.getId(), name, logged, wKg, reps, wKg <= 0));
         RecordData pr = repo.checkForNewPR(name, wKg);
         b.putInt(RestNotifier.LOGGED, logged);
 

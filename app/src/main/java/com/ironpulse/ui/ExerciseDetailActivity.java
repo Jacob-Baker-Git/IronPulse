@@ -110,7 +110,7 @@ public class ExerciseDetailActivity extends AppCompatActivity {
 
         // Count sets already logged for this exercise on this date
         loggedSets = (int) repo.setLogs.stream()
-                .filter(s -> s.getExerciseName().equals(exercise.getName())
+                .filter(s -> s.belongsTo(exercise)
                           && s.getDate().equals(date))
                 .count();
 
@@ -156,7 +156,7 @@ public class ExerciseDetailActivity extends AppCompatActivity {
         if (exercise == null) return;
         // The notification quick-log may have advanced things while we were away
         int count = (int) repo.setLogs.stream()
-                .filter(s -> s.getExerciseName().equals(exercise.getName())
+                .filter(s -> s.belongsTo(exercise)
                           && s.getDate().equals(date))
                 .count();
         if (count != loggedSets) { loggedSets = count; refresh(); }
@@ -215,7 +215,7 @@ public class ExerciseDetailActivity extends AppCompatActivity {
             repsField.setText(String.valueOf(exercise.getRepsPerSet()));
 
         List<SetLog> todaySets = repo.setLogs.stream()
-                .filter(s -> s.getExerciseName().equals(exercise.getName())
+                .filter(s -> s.belongsTo(exercise)
                           && s.getDate().equals(date))
                 .collect(Collectors.toList());
         historyView.setText(todaySets.isEmpty() ? "No sets logged yet"
@@ -249,7 +249,7 @@ public class ExerciseDetailActivity extends AppCompatActivity {
         loggedSets++;
         lastWKg = isBW || exercise.isBodyweight() ? 0 : wKg;
         lastReps = reps;
-        repo.setLogs.add(new SetLog(date, exercise.getName(), loggedSets,
+        repo.setLogs.add(new SetLog(date, exercise.getId(), exercise.getName(), loggedSets,
                 wKg, reps, isBW || exercise.isBodyweight()));
         RecordData pr = repo.checkForNewPR(exercise.getName(),
                 isBW || exercise.isBodyweight() ? 0 : wKg);
@@ -351,11 +351,7 @@ public class ExerciseDetailActivity extends AppCompatActivity {
         // Vibrate
         Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
         if (v == null || !v.hasVibrator()) return;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            v.vibrate(VibrationEffect.createWaveform(new long[]{0, 200, 100, 200, 100, 300}, -1));
-        } else {
-            v.vibrate(new long[]{0, 200, 100, 200, 100, 300}, -1);
-        }
+        v.vibrate(VibrationEffect.createWaveform(new long[]{0, 200, 100, 200, 100, 300}, -1));
     }
 
     private void cancelTimer() {
