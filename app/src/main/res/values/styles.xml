@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <!-- Dark theme (default) -->
     <style name="Theme.IronPulse" parent="Theme.MaterialComponents.NoActionBar">
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
         <item name="colorPrimary">@color/accent</item>
         <item name="colorPrimaryDark">@color/accent_dark</item>
         <item name="colorAccent">@color/accent</item>
@@ -28,7 +28,7 @@
     <!-- Light theme -->
     <style name="Theme.IronPulse.Light" parent="Theme.MaterialComponents.Light.NoActionBar">
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
         <item name="colorPrimary">@color/accent</item>
         <item name="colorPrimaryDark">@color/accent_dark</item>
         <item name="colorAccent">@color/accent</item>
